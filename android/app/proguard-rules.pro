@@ -22,3 +22,14 @@
 -keepattributes Signature
 -keepattributes *Annotation*
 -dontwarn sun.misc.**
+
+# ─── Play Core (Flutter deferred components) ─────────────────────
+# Flutter's PlayStoreDeferredComponentManager references Play Core
+# split-install classes at compile time. This app doesn't use
+# deferred components, so we suppress the missing-class R8 errors.
+-dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
+-keep class com.google.android.play.core.splitcompat.SplitCompatApplication { *; }
+-keep class com.google.android.play.core.splitinstall.** { *; }
+-keep class com.google.android.play.core.tasks.** { *; }
