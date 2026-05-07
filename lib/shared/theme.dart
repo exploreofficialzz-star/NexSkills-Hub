@@ -35,11 +35,12 @@ class AppTheme {
           letterSpacing: -0.3,
         ),
       ),
-      cardTheme: CardThemeData(
+      // CardTheme (not CardThemeData) works across all Flutter versions
+      cardTheme: const CardTheme(
         color: AppColors.card,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.all(Radius.circular(16)),
         ),
         margin: EdgeInsets.zero,
       ),

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import '../core/constants/app_constants.dart';
-import '../core/models/resource_model.dart';
-import '../core/services/ad_service.dart';
-import '../core/services/hive_service.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/models/resource_model.dart';
+import '../../core/services/ad_service.dart';
+import '../../core/services/hive_service.dart';
 
 // ─── Banner Ad Widget ────────────────────────────────────────────
 class BannerAdWidget extends StatefulWidget {
