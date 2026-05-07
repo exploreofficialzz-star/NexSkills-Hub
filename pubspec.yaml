@@ -15,7 +15,7 @@ dependencies:
   hive_flutter: ^1.1.0
 
   # RSS & HTTP
-  webfeed: ^0.7.0
+  dart_rss: ^3.0.2
   http: ^1.2.0
 
   # Video & Web Content
