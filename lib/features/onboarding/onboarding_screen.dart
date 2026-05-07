@@ -38,8 +38,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
     await HiveService.saveProgress(progress);
 
-    await NotificationService.requestPermissions();
-    await NotificationService.scheduleDailyReminder(hour: 9, minute: 0);
+    // Notification setup is best-effort — don't block navigation if it fails
+    // (e.g. permission denied, plugin not initialized, timezone error).
+    try {
+      await NotificationService.requestPermissions();
+      await NotificationService.scheduleDailyReminder(hour: 9, minute: 0);
+    } catch (_) {}
 
     if (mounted) {
       Navigator.of(context).pushReplacement(
@@ -80,21 +84,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('chAs',
-                  style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700)),
-              const SizedBox(width: 4),
-              Text('NexSkills Hub',
-                  style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500)),
-            ],
+          Text(
+            'NexSkills Hub',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 20),
           Row(
