@@ -1,5 +1,5 @@
 import 'package:http/http.dart' as http;
-import 'package:webfeed/webfeed.dart';
+import 'package:dart_rss/dart_rss.dart';
 import '../constants/sources.dart';
 import '../models/resource_model.dart';
 import 'hive_service.dart';
@@ -52,11 +52,15 @@ class RssService {
               : '';
           if (url.isEmpty) continue;
 
+          // dart_rss exposes media via entry.media?.group?.contents
+          // Fall back to URL-derived thumbnail if media is absent.
           String? thumbnail;
-          final mediaContent = entry.media?.group?.contents;
-          if (mediaContent != null && mediaContent.isNotEmpty) {
-            thumbnail = mediaContent.first.url;
-          }
+          try {
+            final contents = entry.media?.group?.contents;
+            if (contents != null && contents.isNotEmpty) {
+              thumbnail = contents.first.url;
+            }
+          } catch (_) {}
           thumbnail ??= _youtubeThumbnail(url);
 
           items.add(ResourceModel(
