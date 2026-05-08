@@ -21,6 +21,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   List<ResourceModel> _items = [];
   bool _loading = true;
   bool _refreshing = false;
+  String? _error;
 
   final _categories = [
     ('all', '🌐', 'All'),
@@ -53,23 +54,34 @@ class _ExploreScreenState extends State<ExploreScreen> {
             HiveService.getResourcesByCategory('cloud')
         : HiveService.getResourcesByCategory(_selectedCategory);
     cached.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    if (mounted) setState(() { _items = cached; _loading = false; });
+    if (mounted) setState(() => _items = cached);
   }
 
   Future<void> _fetchFresh() async {
-    setState(() => _refreshing = true);
+    if (mounted) setState(() { _refreshing = true; _error = null; });
+
     try {
-      final before = _items.length;
+      final countBefore = _items.length;
       await RssService.fetchAll();
-      _loadFromCache();
-      final after = _items.length;
-      final newCount = after - before;
+      _loadFromCache(); // reload from Hive after saving
+      if (mounted) setState(() => _loading = false);
+
+      final newCount = _items.length - countBefore;
       if (newCount > 0 && mounted) {
-        await NotificationService.showNewContentNotification(
-            'tech', newCount);
+        try {
+          await NotificationService.showNewContentNotification('tech', newCount);
+        } catch (_) {}
       }
-    } catch (_) {}
-    if (mounted) setState(() => _refreshing = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not fetch content. Check your connection.';
+          _loading = false;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
   }
 
   List<ResourceModel> get _filtered {
@@ -110,6 +122,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             _buildHeader(),
             _buildCategoryFilter(),
             _buildTypeFilter(),
+            if (_error != null) _buildError(),
             Expanded(
               child: _loading
                   ? const ShimmerList()
@@ -164,6 +177,31 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  Widget _buildError() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off, color: AppColors.error, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(_error!,
+                style: const TextStyle(
+                    color: AppColors.error, fontSize: 12)),
+          ),
+          GestureDetector(
+            onTap: _fetchFresh,
+            child: const Text('Retry',
+                style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCategoryFilter() {
     return SizedBox(
       height: 40,
@@ -179,8 +217,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             onTap: () => setState(() => _selectedCategory = cat.$1),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: selected ? AppColors.primary : AppColors.card,
                 borderRadius: BorderRadius.circular(10),
@@ -212,8 +249,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
               onTap: () => setState(() => _selectedType = t.$1),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
                   color: selected
                       ? AppColors.accent.withOpacity(0.15)
@@ -228,9 +265,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 child: Text(
                   t.$2,
                   style: TextStyle(
-                    color: selected
-                        ? AppColors.accent
-                        : AppColors.textMuted,
+                    color:
+                        selected ? AppColors.accent : AppColors.textMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -246,26 +282,31 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget _buildList() {
     final items = _filtered;
     if (items.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('📡', style: TextStyle(fontSize: 48)),
-            SizedBox(height: 16),
-            Text('No content yet',
-                style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700)),
-            SizedBox(height: 6),
-            Text('Pull down to fetch latest content',
-                style: TextStyle(color: AppColors.textMuted)),
-          ],
-        ),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+          const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('📡', style: TextStyle(fontSize: 48)),
+                SizedBox(height: 16),
+                Text('No content yet',
+                    style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700)),
+                SizedBox(height: 6),
+                Text('Pull down to fetch latest content',
+                    style: TextStyle(color: AppColors.textMuted)),
+              ],
+            ),
+          ),
+        ],
       );
     }
 
-    // Insert native ad placeholder every 3 items
     final progress = HiveService.getProgress();
     final withAds = <dynamic>[];
     for (int i = 0; i < items.length; i++) {
@@ -303,60 +344,47 @@ class _NativeAdPlaceholder extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: AppColors.primary.withOpacity(0.2)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'Sponsored',
-                  style: TextStyle(
-                      color: AppColors.warning,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text('Sponsored',
+                style: TextStyle(
+                    color: AppColors.warning,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700)),
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Level Up Your Tech Career 🚀',
-            style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w700),
-          ),
+          const Text('Level Up Your Tech Career 🚀',
+              style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          const Text(
-            'Premium removes all ads and unlocks all tracks.',
-            style: TextStyle(
-                color: AppColors.textSecondary, fontSize: 13),
-          ),
+          const Text('Premium removes all ads and unlocks all tracks.',
+              style:
+                  TextStyle(color: AppColors.textSecondary, fontSize: 13)),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.primary,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Text(
-              'Go Premium — \$9.99/month',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700),
-            ),
+            child: const Text('Go Premium — \$9.99/month',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
           ),
         ],
       ),

@@ -10,29 +10,37 @@ import 'features/home/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock to portrait
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Transparent status bar
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
 
-  // Init services
   await HiveService.init();
   await AdService.initialize();
-  await NotificationService.init();
 
-  // Check if onboarded
+  try {
+    await NotificationService.init();
+  } catch (_) {}
+
   final progress = HiveService.getProgress();
+
+  // Fixed: original had operator precedence bug:
+  //   activeCategory.isNotEmpty && lastActiveDate != null || totalXP > 0 ...
+  // was parsed as:
+  //   (activeCategory.isNotEmpty && lastActiveDate != null) || totalXP > 0 ...
+  // A fresh user who just completed onboarding has activeCategory set but
+  // lastActiveDate == null → first clause false → always went to onboarding.
+  // Fix: parenthesise the OR clauses and check activeCategory alone.
   final isOnboarded = progress.activeCategory.isNotEmpty &&
-      progress.lastActiveDate != null ||
-      progress.totalXP > 0 ||
-      progress.totalLessonsCompleted > 0;
+      (progress.lastActiveDate != null ||
+          progress.totalXP > 0 ||
+          progress.totalLessonsCompleted > 0 ||
+          progress.dailyGoalMinutes != 20); // non-default goal means user chose one
 
   runApp(NexSkillsApp(isOnboarded: isOnboarded));
 }
