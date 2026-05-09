@@ -7,7 +7,9 @@ import '../../shared/widgets/shared_widgets.dart';
 import '../premium/premium_screen.dart';
 
 class ProgressScreen extends StatefulWidget {
-  const ProgressScreen({super.key});
+  final void Function(ThemeMode)? onThemeModeChanged;
+
+  const ProgressScreen({super.key, this.onThemeModeChanged});
 
   @override
   State<ProgressScreen> createState() => _ProgressScreenState();
@@ -15,11 +17,13 @@ class ProgressScreen extends StatefulWidget {
 
 class _ProgressScreenState extends State<ProgressScreen> {
   late UserProgress _progress;
+  late ThemeMode _currentTheme;
 
   @override
   void initState() {
     super.initState();
-    _progress = HiveService.getProgress();
+    _progress     = HiveService.getProgress();
+    _currentTheme = HiveService.getThemeMode() ?? ThemeMode.system;
   }
 
   @override
@@ -28,37 +32,45 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _progress = HiveService.getProgress());
   }
 
+  void _changeTheme(ThemeMode mode) {
+    setState(() => _currentTheme = mode);
+    widget.onThemeModeChanged?.call(mode);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: c.background,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async =>
               setState(() => _progress = HiveService.getProgress()),
-          color: AppColors.primary,
-          backgroundColor: AppColors.card,
+          color: NexColors.primary,
+          backgroundColor: c.card,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(),
+                _buildHeader(c),
                 const SizedBox(height: 20),
-                if (!_progress.isPremium) _buildPremiumBanner(),
-                if (!_progress.isPremium) const SizedBox(height: 20),
-                _buildStatsRow(),
+                if (!_progress.isPremium) ...[
+                  _buildPremiumBanner(c),
+                  const SizedBox(height: 20),
+                ],
+                _buildStatsRow(c),
                 const SizedBox(height: 24),
-                _buildCurrentPath(),
+                _buildCurrentPath(c),
                 const SizedBox(height: 24),
-                _buildBadges(),
+                _buildBadges(c),
                 const SizedBox(height: 24),
-                _buildBookmarks(),
+                _buildBookmarks(c),
                 const SizedBox(height: 24),
-                _buildSettings(),
+                _buildSettings(c),
                 const SizedBox(height: 20),
-                const BannerAdWidget(),
+                const AdaptiveBannerWidget(),
               ],
             ),
           ),
@@ -67,16 +79,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(NexColors c) {
     return Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('My Progress',
+              Text('My Progress',
                   style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: c.textPrimary,
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.8)),
@@ -84,8 +96,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 _progress.isPremium ? '👑 Premium Member' : 'Free Plan',
                 style: TextStyle(
                     color: _progress.isPremium
-                        ? AppColors.gold
-                        : AppColors.textMuted,
+                        ? NexColors.gold
+                        : c.textMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.w600),
               ),
@@ -96,11 +108,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
           GestureDetector(
             onTap: _openPremium,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.accent]),
+                    colors: [NexColors.primary, NexColors.accent]),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text('Go Premium',
@@ -114,18 +125,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildPremiumBanner() {
+  Widget _buildPremiumBanner(NexColors c) {
     return GestureDetector(
       onTap: _openPremium,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.primary.withOpacity(0.9),
-              AppColors.accent.withOpacity(0.8)
-            ],
-          ),
+          gradient: const LinearGradient(
+              colors: [NexColors.primary, NexColors.accent]),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -142,69 +149,45 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           fontSize: 16,
                           fontWeight: FontWeight.w800)),
                   Text('Remove all ads · All 5 tracks · \$9.99/mo',
-                      style: TextStyle(
-                          color: Colors.white70, fontSize: 12)),
+                      style: TextStyle(color: Colors.white70, fontSize: 12)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios,
-                color: Colors.white70, size: 16),
+            const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow(NexColors c) {
     return Row(
       children: [
-        Expanded(
-          child: StatPill(
-            label: 'Day Streak',
-            value: '🔥 ${_progress.streakDays}',
-            color: AppColors.accentOrange,
-          ),
-        ),
+        Expanded(child: StatPill(label: 'Day Streak', value: '🔥 ${_progress.streakDays}', color: NexColors.accentOrange)),
         const SizedBox(width: 12),
-        Expanded(
-          child: StatPill(
-            label: 'Total XP',
-            value: '⭐ ${_progress.totalXP}',
-            color: AppColors.gold,
-          ),
-        ),
+        Expanded(child: StatPill(label: 'Total XP',   value: '⭐ ${_progress.totalXP}',   color: NexColors.gold)),
         const SizedBox(width: 12),
-        Expanded(
-          child: StatPill(
-            label: 'Lessons',
-            value: '📚 ${_progress.totalLessonsCompleted}',
-            color: AppColors.primary,
-          ),
-        ),
+        Expanded(child: StatPill(label: 'Lessons',    value: '📚 ${_progress.totalLessonsCompleted}', color: NexColors.primary)),
       ],
     );
   }
 
-  Widget _buildCurrentPath() {
+  Widget _buildCurrentPath(NexColors c) {
     final cat = AppCategories.all
         .firstWhere((c) => c.id == _progress.activeCategory,
             orElse: () => AppCategories.all.first);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Active Track',
-            style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700)),
+        Text('Active Track',
+            style: TextStyle(color: c.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(16),
-          ),
+              color: c.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: c.border, width: 0.5)),
           child: Row(
             children: [
               Text(cat.icon, style: const TextStyle(fontSize: 32)),
@@ -214,33 +197,24 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(cat.title,
-                        style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700)),
+                        style: TextStyle(
+                            color: c.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
                     Text(
                       '${_progress.activeLevel[0].toUpperCase()}${_progress.activeLevel.substring(1)} path',
-                      style: const TextStyle(
-                          color: AppColors.textMuted, fontSize: 13),
+                      style: TextStyle(color: c.textMuted, fontSize: 13),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: cat.color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  _progress.activeLevel.toUpperCase(),
-                  style: TextStyle(
-                      color: cat.color,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700),
-                ),
+                    color: cat.color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10)),
+                child: Text(_progress.activeLevel.toUpperCase(),
+                    style: TextStyle(
+                        color: cat.color, fontSize: 11, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -249,63 +223,54 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildBadges() {
+  Widget _buildBadges(NexColors c) {
     final allBadges = {
-      'first_step': ('🏅', 'First Step', 'Complete your first lesson'),
-      'streak_3': ('🔥', '3-Day Streak', 'Learn 3 days in a row'),
-      'streak_7': ('🔥🔥', '7-Day Streak', 'Learn 7 days in a row'),
-      'streak_30': ('⚡', '30-Day Legend', 'Learn 30 days in a row'),
-      'xp_100': ('⭐', '100 XP Club', 'Earn 100 XP total'),
-      'xp_500': ('🌟', '500 XP Legend', 'Earn 500 XP total'),
-      'lessons_10': ('📚', '10 Lessons', 'Complete 10 lessons'),
+      'first_step': ('🏅', 'First Step',    'Complete your first lesson'),
+      'streak_3':   ('🔥', '3-Day Streak',  'Learn 3 days in a row'),
+      'streak_7':   ('🔥🔥', '7-Day Streak','Learn 7 days in a row'),
+      'streak_30':  ('⚡', '30-Day Legend', 'Learn 30 days in a row'),
+      'xp_100':     ('⭐', '100 XP Club',   'Earn 100 XP total'),
+      'xp_500':     ('🌟', '500 XP Legend', 'Earn 500 XP total'),
+      'lessons_10': ('📚', '10 Lessons',    'Complete 10 lessons'),
     };
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Badges (${_progress.earnedBadges.length}/${allBadges.length})',
-            style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700)),
+            style: TextStyle(color: c.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.8,
+            crossAxisCount: 4, crossAxisSpacing: 10,
+            mainAxisSpacing: 10, childAspectRatio: 0.8,
           ),
           itemCount: allBadges.length,
           itemBuilder: (_, i) {
-            final entry = allBadges.entries.elementAt(i);
+            final entry  = allBadges.entries.elementAt(i);
             final earned = _progress.earnedBadges.contains(entry.key);
-            final data = entry.value;
+            final data   = entry.value;
             return Column(
               children: [
                 Container(
-                  width: 58,
-                  height: 58,
+                  width: 58, height: 58,
                   decoration: BoxDecoration(
                     color: earned
-                        ? AppColors.gold.withOpacity(0.15)
-                        : AppColors.card,
+                        ? NexColors.gold.withOpacity(0.15)
+                        : c.card,
                     shape: BoxShape.circle,
                     border: Border.all(
                         color: earned
-                            ? AppColors.gold.withOpacity(0.5)
-                            : Colors.transparent),
+                            ? NexColors.gold.withOpacity(0.5)
+                            : c.border),
                   ),
                   child: Center(
                     child: Text(
                       earned ? data.$1 : '🔒',
                       style: TextStyle(
                           fontSize: 24,
-                          color: earned
-                              ? null
-                              : AppColors.textMuted.withOpacity(0.3)),
+                          color: earned ? null : c.textMuted.withOpacity(0.3)),
                     ),
                   ),
                 ),
@@ -313,9 +278,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 Text(data.$2,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        color: earned
-                            ? AppColors.textPrimary
-                            : AppColors.textMuted,
+                        color: earned ? c.textPrimary : c.textMuted,
                         fontSize: 10,
                         fontWeight: FontWeight.w600)),
               ],
@@ -326,31 +289,25 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildBookmarks() {
+  Widget _buildBookmarks(NexColors c) {
     final bookmarks = HiveService.getBookmarks();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Text('Bookmarks',
+            Text('Bookmarks',
                 style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700)),
+                    color: c.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
+                  color: NexColors.primary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8)),
               child: Text('${bookmarks.length}',
                   style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700)),
+                      color: NexColors.primary, fontSize: 12, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -359,16 +316,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
+                color: c.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: c.border, width: 0.5)),
+            child: Row(
               children: [
-                Text('🔖', style: TextStyle(fontSize: 24)),
-                SizedBox(width: 12),
+                const Text('🔖', style: TextStyle(fontSize: 24)),
+                const SizedBox(width: 12),
                 Text('No bookmarks yet.\nSave content from Explore.',
-                    style: TextStyle(
-                        color: AppColors.textMuted, fontSize: 13)),
+                    style: TextStyle(color: c.textMuted, fontSize: 13)),
               ],
             ),
           )
@@ -377,9 +333,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                    color: c.card,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: c.border, width: 0.5)),
                 child: Row(
                   children: [
                     Text(r.type == 'video' ? '📹' : '📝',
@@ -390,16 +346,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(r.title,
-                              style: const TextStyle(
-                                  color: AppColors.textPrimary,
+                              style: TextStyle(
+                                  color: c.textPrimary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis),
+                              maxLines: 2, overflow: TextOverflow.ellipsis),
                           Text(r.sourceName,
-                              style: const TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 11)),
+                              style: TextStyle(color: c.textMuted, fontSize: 11)),
                         ],
                       ),
                     ),
@@ -410,21 +363,30 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildSettings() {
+  Widget _buildSettings(NexColors c) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Settings',
+        Text('Settings',
             style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700)),
+                color: c.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
+
+        // ── Appearance / theme toggle ─────────────────────────
+        Text('Appearance',
+            style: TextStyle(
+                color: c.textMuted, fontSize: 12, fontWeight: FontWeight.w600,
+                letterSpacing: 0.5)),
+        const SizedBox(height: 8),
+        ThemeToggleTile(current: _currentTheme, onChanged: _changeTheme),
+        const SizedBox(height: 16),
+
+        // ── Other settings ────────────────────────────────────
         Container(
           decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(16),
-          ),
+              color: c.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: c.border, width: 0.5)),
           child: Column(
             children: [
               _SettingsTile(
@@ -432,8 +394,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 label: 'Daily Reminder',
                 subtitle: '9:00 AM every day',
                 onTap: () {},
+                c: c,
               ),
-              const Divider(height: 1, color: AppColors.surface),
+              Divider(height: 1, color: c.border),
               _SettingsTile(
                 icon: Icons.workspace_premium_outlined,
                 label: 'Premium',
@@ -441,17 +404,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ? 'Active — \$9.99/month'
                     : 'Upgrade for ad-free learning',
                 onTap: _openPremium,
+                c: c,
                 trailing: _progress.isPremium
                     ? const Icon(Icons.check_circle,
-                        color: AppColors.success, size: 20)
+                        color: NexColors.success, size: 20)
                     : null,
               ),
-              const Divider(height: 1, color: AppColors.surface),
+              Divider(height: 1, color: c.border),
               _SettingsTile(
                 icon: Icons.info_outline,
                 label: 'About NexSkills Hub',
                 subtitle: 'by chAs Tech Group · v1.0.0',
                 onTap: () {},
+                c: c,
               ),
             ],
           ),
@@ -466,8 +431,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const PremiumScreen()),
-        ).then((_) =>
-            setState(() => _progress = HiveService.getProgress()));
+        ).then((_) => setState(() => _progress = HiveService.getProgress()));
       }
     });
   }
@@ -475,35 +439,28 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final String subtitle;
+  final String label, subtitle;
   final VoidCallback onTap;
   final Widget? trailing;
+  final NexColors c;
 
   const _SettingsTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.onTap,
-    this.trailing,
+    required this.icon, required this.label, required this.subtitle,
+    required this.onTap, required this.c, this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
-      leading: Icon(icon, color: AppColors.primary, size: 22),
+      leading: Icon(icon, color: NexColors.primary, size: 22),
       title: Text(label,
-          style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w600)),
+          style: TextStyle(
+              color: c.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
       subtitle: Text(subtitle,
-          style: const TextStyle(
-              color: AppColors.textMuted, fontSize: 12)),
+          style: TextStyle(color: c.textMuted, fontSize: 12)),
       trailing: trailing ??
-          const Icon(Icons.arrow_forward_ios,
-              color: AppColors.textMuted, size: 14),
+          Icon(Icons.arrow_forward_ios, color: c.textMuted, size: 14),
     );
   }
 }

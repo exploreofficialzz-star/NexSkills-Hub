@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/resource_model.dart';
 import '../models/user_progress.dart';
@@ -5,7 +6,9 @@ import '../models/user_progress.dart';
 class HiveService {
   static const _resourceBox = 'resources';
   static const _progressBox = 'progress';
-  static const _seenIdsBox = 'seenIds';
+  static const _seenIdsBox  = 'seenIds';
+  static const _settingsBox = 'settings';
+  static const _themeModeKey = 'themeMode';
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -14,6 +17,7 @@ class HiveService {
     await Hive.openBox<ResourceModel>(_resourceBox);
     await Hive.openBox<UserProgress>(_progressBox);
     await Hive.openBox<String>(_seenIdsBox);
+    await Hive.openBox(_settingsBox);
   }
 
   // ─── Resources ───────────────────────────────────────────────
@@ -43,30 +47,21 @@ class HiveService {
 
   static Future<void> toggleBookmark(String id) async {
     final item = _resources.get(id);
-    if (item != null) {
-      item.isBookmarked = !item.isBookmarked;
-      await item.save();
-    }
+    if (item != null) { item.isBookmarked = !item.isBookmarked; await item.save(); }
   }
 
   static Future<void> markRead(String id) async {
     final item = _resources.get(id);
-    if (item != null) {
-      item.isRead = true;
-      await item.save();
-    }
+    if (item != null) { item.isRead = true; await item.save(); }
   }
 
   // ─── User Progress ───────────────────────────────────────────
   static Box<UserProgress> get _progress => Hive.box<UserProgress>(_progressBox);
 
-  static UserProgress getProgress() {
-    return _progress.get('main') ?? UserProgress();
-  }
+  static UserProgress getProgress() => _progress.get('main') ?? UserProgress();
 
-  static Future<void> saveProgress(UserProgress progress) async {
-    await _progress.put('main', progress);
-  }
+  static Future<void> saveProgress(UserProgress progress) async =>
+      _progress.put('main', progress);
 
   static Future<UserProgress> completeStep(
       String pathId, int stepOrder, int xpReward) async {
@@ -85,52 +80,29 @@ class HiveService {
   }
 
   static Future<void> _updateStreak(UserProgress p) async {
-    final now = DateTime.now();
+    final now   = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     if (p.lastActiveDate == null) {
-      p.streakDays = 1;
-      p.lastActiveDate = today;
+      p.streakDays = 1; p.lastActiveDate = today;
     } else {
       final last = DateTime(
-        p.lastActiveDate!.year,
-        p.lastActiveDate!.month,
-        p.lastActiveDate!.day,
-      );
+          p.lastActiveDate!.year, p.lastActiveDate!.month, p.lastActiveDate!.day);
       final diff = today.difference(last).inDays;
-      if (diff == 1) {
-        p.streakDays += 1;
-        p.lastActiveDate = today;
-      } else if (diff > 1) {
-        p.streakDays = 1;
-        p.lastActiveDate = today;
-      }
+      if (diff == 1) { p.streakDays += 1; p.lastActiveDate = today; }
+      else if (diff > 1) { p.streakDays = 1; p.lastActiveDate = today; }
     }
   }
 
   static Future<void> _checkBadges(UserProgress p) async {
-    final badges = p.earnedBadges;
-    if (!badges.contains('first_step') && p.totalLessonsCompleted >= 1) {
-      badges.add('first_step');
-    }
-    if (!badges.contains('streak_3') && p.streakDays >= 3) {
-      badges.add('streak_3');
-    }
-    if (!badges.contains('streak_7') && p.streakDays >= 7) {
-      badges.add('streak_7');
-    }
-    if (!badges.contains('streak_30') && p.streakDays >= 30) {
-      badges.add('streak_30');
-    }
-    if (!badges.contains('xp_100') && p.totalXP >= 100) {
-      badges.add('xp_100');
-    }
-    if (!badges.contains('xp_500') && p.totalXP >= 500) {
-      badges.add('xp_500');
-    }
-    if (!badges.contains('lessons_10') && p.totalLessonsCompleted >= 10) {
-      badges.add('lessons_10');
-    }
-    p.earnedBadges = badges;
+    final b = p.earnedBadges;
+    if (!b.contains('first_step')  && p.totalLessonsCompleted >= 1)  b.add('first_step');
+    if (!b.contains('streak_3')    && p.streakDays >= 3)             b.add('streak_3');
+    if (!b.contains('streak_7')    && p.streakDays >= 7)             b.add('streak_7');
+    if (!b.contains('streak_30')   && p.streakDays >= 30)            b.add('streak_30');
+    if (!b.contains('xp_100')      && p.totalXP >= 100)              b.add('xp_100');
+    if (!b.contains('xp_500')      && p.totalXP >= 500)              b.add('xp_500');
+    if (!b.contains('lessons_10')  && p.totalLessonsCompleted >= 10) b.add('lessons_10');
+    p.earnedBadges = b;
   }
 
   static Future<void> recordInterstitialShown() async {
@@ -145,4 +117,18 @@ class HiveService {
     p.premiumExpiry = expiry;
     await saveProgress(p);
   }
+
+  // ─── Theme preference ────────────────────────────────────────
+  static Box get _settings => Hive.box(_settingsBox);
+
+  /// Returns null if the user has never explicitly set a preference
+  /// (caller should default to ThemeMode.system).
+  static ThemeMode? getThemeMode() {
+    final index = _settings.get(_themeModeKey) as int?;
+    if (index == null) return null;
+    return ThemeMode.values[index.clamp(0, ThemeMode.values.length - 1)];
+  }
+
+  static Future<void> saveThemeMode(ThemeMode mode) async =>
+      _settings.put(_themeModeKey, mode.index);
 }

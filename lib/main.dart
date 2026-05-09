@@ -38,51 +38,48 @@ class NexSkillsApp extends StatefulWidget {
 }
 
 class _NexSkillsAppState extends State<NexSkillsApp> {
-  // Reads the saved preference from Hive; falls back to system.
   ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void initState() {
     super.initState();
-    final saved = HiveService.getThemeMode();
-    if (saved != null) {
-      _themeMode = saved;
-    }
+    // Restore saved preference; fall back to system
+    _themeMode = HiveService.getThemeMode() ?? ThemeMode.system;
+    _applyOverlay(_themeMode);
   }
 
   void setThemeMode(ThemeMode mode) {
     setState(() => _themeMode = mode);
     HiveService.saveThemeMode(mode);
-    // Update status bar icons to match new theme immediately
-    _applySystemUiOverlay(mode);
+    _applyOverlay(mode);
   }
 
-  void _applySystemUiOverlay(ThemeMode mode) {
-    final brightness = switch (mode) {
-      ThemeMode.dark   => Brightness.dark,
-      ThemeMode.light  => Brightness.light,
-      ThemeMode.system => WidgetsBinding
-              .instance.platformDispatcher.platformBrightness,
-    };
+  void _applyOverlay(ThemeMode mode) {
+    final brightness = mode == ThemeMode.dark
+        ? Brightness.dark
+        : mode == ThemeMode.light
+            ? Brightness.light
+            : WidgetsBinding.instance.platformDispatcher.platformBrightness;
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor:          Colors.transparent,
-      statusBarIconBrightness: brightness == Brightness.dark
-          ? Brightness.light
-          : Brightness.dark,
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness:
+          brightness == Brightness.dark ? Brightness.light : Brightness.dark,
     ));
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title:                   'NexSkills Hub',
+      title:                      'NexSkills Hub',
       debugShowCheckedModeBanner: false,
-      theme:      AppTheme.light,
-      darkTheme:  AppTheme.dark,
-      themeMode:  _themeMode,
+      theme:     AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: _themeMode,
       home: widget.isOnboarded
+          // Theme switcher lives inside HomeScreen → ProgressScreen only.
+          // OnboardingScreen uses system default — no switcher needed there.
           ? HomeScreen(onThemeModeChanged: setThemeMode)
-          : OnboardingScreen(onThemeModeChanged: setThemeMode),
+          : const OnboardingScreen(),
     );
   }
 }
