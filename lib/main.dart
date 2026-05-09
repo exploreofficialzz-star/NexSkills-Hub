@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'core/services/hive_service.dart';
 import 'core/services/ad_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/connectivity_service.dart';
 import 'shared/theme.dart';
+import 'shared/network_aware_wrapper.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/home/home_screen.dart';
 
@@ -15,8 +17,12 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Init all services in parallel where possible
   await HiveService.init();
-  await AdService.initialize();
+  await Future.wait([
+    AdService.initialize(),
+    ConnectivityService.instance.init(),
+  ]);
   try { await NotificationService.init(); } catch (_) {}
 
   final progress = HiveService.getProgress();
@@ -37,15 +43,34 @@ class NexSkillsApp extends StatefulWidget {
   State<NexSkillsApp> createState() => _NexSkillsAppState();
 }
 
-class _NexSkillsAppState extends State<NexSkillsApp> {
+class _NexSkillsAppState extends State<NexSkillsApp>
+    with WidgetsBindingObserver {
   ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void initState() {
     super.initState();
-    // Restore saved preference; fall back to system
+    WidgetsBinding.instance.addObserver(this);
     _themeMode = HiveService.getThemeMode() ?? ThemeMode.system;
     _applyOverlay(_themeMode);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // ── App lifecycle → app-open ad + connectivity re-check ──────
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      AdLifecycleObserver.onPause();
+    } else if (state == AppLifecycleState.resumed) {
+      AdLifecycleObserver.onResume();
+      // Re-check connectivity on resume (catches airplane mode toggled in background)
+      ConnectivityService.instance.check();
+    }
   }
 
   void setThemeMode(ThemeMode mode) {
@@ -55,15 +80,17 @@ class _NexSkillsAppState extends State<NexSkillsApp> {
   }
 
   void _applyOverlay(ThemeMode mode) {
-    final brightness = mode == ThemeMode.dark
-        ? Brightness.dark
-        : mode == ThemeMode.light
-            ? Brightness.light
-            : WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final brightness = switch (mode) {
+      ThemeMode.dark   => Brightness.dark,
+      ThemeMode.light  => Brightness.light,
+      ThemeMode.system =>
+          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+    };
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
+      statusBarColor:            Colors.transparent,
       statusBarIconBrightness:
           brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor:  Colors.transparent,
     ));
   }
 
@@ -75,11 +102,13 @@ class _NexSkillsAppState extends State<NexSkillsApp> {
       theme:     AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _themeMode,
-      home: widget.isOnboarded
-          // Theme switcher lives inside HomeScreen → ProgressScreen only.
-          // OnboardingScreen uses system default — no switcher needed there.
-          ? HomeScreen(onThemeModeChanged: setThemeMode)
-          : const OnboardingScreen(),
+      // NetworkAwareWrapper sits inside MaterialApp so it has
+      // access to Theme.of(context) for the correct color palette
+      home: NetworkAwareWrapper(
+        child: widget.isOnboarded
+            ? HomeScreen(onThemeModeChanged: setThemeMode)
+            : const OnboardingScreen(),
+      ),
     );
   }
 }
