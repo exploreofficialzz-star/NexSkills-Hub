@@ -17,24 +17,24 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   String _selectedCategory = 'all';
-  String _selectedType = 'all';
+  String _selectedType     = 'all';
   List<ResourceModel> _items = [];
-  bool _loading = true;
+  bool _loading    = true;  // true on first open until cache+fetch both settle
   bool _refreshing = false;
   String? _error;
 
-  final _categories = [
-    ('all', '🌐', 'All'),
-    ('ai', '🤖', 'AI'),
-    ('cybersecurity', '🔐', 'Cyber'),
-    ('nocode', '⚡', 'No-Code'),
-    ('data', '📊', 'Data'),
-    ('cloud', '☁️', 'Cloud'),
+  final _categories = const [
+    ('all',          '🌐', 'All'),
+    ('ai',           '🤖', 'AI'),
+    ('cybersecurity','🔐', 'Cyber'),
+    ('nocode',       '⚡', 'No-Code'),
+    ('data',         '📊', 'Data'),
+    ('cloud',        '☁️', 'Cloud'),
   ];
 
-  final _types = [
-    ('all', 'All'),
-    ('video', 'Videos'),
+  final _types = const [
+    ('all',     'All'),
+    ('video',   'Videos'),
     ('article', 'Articles'),
   ];
 
@@ -47,40 +47,39 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _loadFromCache() {
     final cached = _selectedCategory == 'all'
-        ? HiveService.getResourcesByCategory('ai') +
-            HiveService.getResourcesByCategory('cybersecurity') +
-            HiveService.getResourcesByCategory('nocode') +
-            HiveService.getResourcesByCategory('data') +
-            HiveService.getResourcesByCategory('cloud')
+        ? ['ai', 'cybersecurity', 'nocode', 'data', 'cloud']
+            .expand((cat) => HiveService.getResourcesByCategory(cat))
+            .toList()
         : HiveService.getResourcesByCategory(_selectedCategory);
     cached.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    if (mounted) setState(() => _items = cached);
+    if (mounted) {
+      setState(() {
+        _items = cached;
+        // only clear loading flag if we have something to show
+        if (cached.isNotEmpty) _loading = false;
+      });
+    }
   }
 
   Future<void> _fetchFresh() async {
     if (mounted) setState(() { _refreshing = true; _error = null; });
-
     try {
-      final countBefore = _items.length;
+      final before = _items.length;
       await RssService.fetchAll();
-      _loadFromCache(); // reload from Hive after saving
-      if (mounted) setState(() => _loading = false);
-
-      final newCount = _items.length - countBefore;
-      if (newCount > 0 && mounted) {
+      _loadFromCache();
+      final after = _items.length;
+      if (after - before > 0 && mounted) {
         try {
-          await NotificationService.showNewContentNotification('tech', newCount);
+          await NotificationService.showNewContentNotification(
+              'tech', after - before);
         } catch (_) {}
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _error = 'Could not fetch content. Check your connection.';
-          _loading = false;
-        });
+        setState(() => _error = 'Could not fetch content. Check your connection.');
       }
     } finally {
-      if (mounted) setState(() => _refreshing = false);
+      if (mounted) setState(() { _refreshing = false; _loading = false; });
     }
   }
 
@@ -114,23 +113,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: c.background,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
-            _buildCategoryFilter(),
-            _buildTypeFilter(),
-            if (_error != null) _buildError(),
+            _buildHeader(c),
+            _buildCategoryFilter(c),
+            _buildTypeFilter(c),
+            if (_error != null) _buildErrorBar(c),
             Expanded(
               child: _loading
                   ? const ShimmerList()
                   : RefreshIndicator(
                       onRefresh: _fetchFresh,
-                      color: AppColors.primary,
-                      backgroundColor: AppColors.card,
-                      child: _buildList(),
+                      color: NexColors.primary,
+                      backgroundColor: c.card,
+                      child: _buildList(c),
                     ),
             ),
           ],
@@ -139,61 +139,59 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(NexColors c) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Explore',
                     style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: c.textPrimary,
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.8)),
                 Text('Fresh content from top sources',
-                    style: TextStyle(
-                        color: AppColors.textMuted, fontSize: 13)),
+                    style: TextStyle(color: c.textMuted, fontSize: 13)),
               ],
             ),
           ),
-          if (_refreshing)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.primary),
-            )
-          else
-            GestureDetector(
-              onTap: _fetchFresh,
-              child: const Icon(Icons.refresh, color: AppColors.textMuted),
-            ),
+          _refreshing
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: NexColors.primary),
+                )
+              : GestureDetector(
+                  onTap: _fetchFresh,
+                  child: Icon(Icons.refresh, color: c.textMuted),
+                ),
         ],
       ),
     );
   }
 
-  Widget _buildError() {
+  Widget _buildErrorBar(NexColors c) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off, color: AppColors.error, size: 16),
+          const Icon(Icons.wifi_off, color: NexColors.error, size: 14),
           const SizedBox(width: 8),
           Expanded(
             child: Text(_error!,
-                style: const TextStyle(
-                    color: AppColors.error, fontSize: 12)),
+                style:
+                    const TextStyle(color: NexColors.error, fontSize: 12)),
           ),
           GestureDetector(
             onTap: _fetchFresh,
             child: const Text('Retry',
                 style: TextStyle(
-                    color: AppColors.primary,
+                    color: NexColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w700)),
           ),
@@ -202,7 +200,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildCategoryFilter() {
+  Widget _buildCategoryFilter(NexColors c) {
     return SizedBox(
       height: 40,
       child: ListView.separated(
@@ -214,18 +212,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
           final cat = _categories[i];
           final selected = _selectedCategory == cat.$1;
           return GestureDetector(
-            onTap: () => setState(() => _selectedCategory = cat.$1),
+            onTap: () => setState(() {
+              _selectedCategory = cat.$1;
+            }),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: selected ? AppColors.primary : AppColors.card,
+                color: selected ? NexColors.primary : c.card,
                 borderRadius: BorderRadius.circular(10),
+                border:
+                    Border.all(color: selected ? NexColors.primary : c.border, width: 0.5),
               ),
               child: Text(
                 '${cat.$2} ${cat.$3}',
                 style: TextStyle(
-                  color: selected ? Colors.white : AppColors.textMuted,
+                  color: selected ? Colors.white : c.textMuted,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -237,7 +240,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildTypeFilter() {
+  Widget _buildTypeFilter(NexColors c) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
       child: Row(
@@ -249,24 +252,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
               onTap: () => setState(() => _selectedType = t.$1),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
                   color: selected
-                      ? AppColors.accent.withOpacity(0.15)
+                      ? NexColors.accent.withOpacity(0.12)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: selected
-                        ? AppColors.accent
-                        : AppColors.textMuted.withOpacity(0.3),
+                        ? NexColors.accent
+                        : c.textMuted.withOpacity(0.3),
                   ),
                 ),
                 child: Text(
                   t.$2,
                   style: TextStyle(
-                    color:
-                        selected ? AppColors.accent : AppColors.textMuted,
+                    color: selected ? NexColors.accent : c.textMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -279,27 +281,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(NexColors c) {
     final items = _filtered;
+
     if (items.isEmpty) {
+      // AlwaysScrollableScrollPhysics = pull-to-refresh works even when empty
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-          const Center(
+          SizedBox(height: MediaQuery.of(context).size.height * 0.22),
+          Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('📡', style: TextStyle(fontSize: 48)),
-                SizedBox(height: 16),
+                const Text('📡', style: TextStyle(fontSize: 52)),
+                const SizedBox(height: 16),
                 Text('No content yet',
                     style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: c.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w700)),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text('Pull down to fetch latest content',
-                    style: TextStyle(color: AppColors.textMuted)),
+                    style: TextStyle(color: c.textMuted, fontSize: 13)),
               ],
             ),
           ),
@@ -317,11 +320,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       itemCount: withAds.length,
       itemBuilder: (_, i) {
         final item = withAds[i];
-        if (item == 'ad') return const _NativeAdPlaceholder();
+        if (item == 'ad') return _NativeAdPlaceholder(c: c);
         final resource = item as ResourceModel;
         return ResourceCard(
           resource: resource,
@@ -333,8 +337,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 }
 
+// ─── Native ad placeholder ────────────────────────────────────────────────────
 class _NativeAdPlaceholder extends StatelessWidget {
-  const _NativeAdPlaceholder();
+  final NexColors c;
+  const _NativeAdPlaceholder({required this.c});
 
   @override
   Widget build(BuildContext context) {
@@ -342,42 +348,39 @@ class _NativeAdPlaceholder extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: c.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        border: Border.all(color: NexColors.primary.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.2),
+              color: NexColors.warning.withOpacity(0.15),
               borderRadius: BorderRadius.circular(6),
             ),
             child: const Text('Sponsored',
                 style: TextStyle(
-                    color: AppColors.warning,
+                    color: NexColors.warning,
                     fontSize: 10,
                     fontWeight: FontWeight.w700)),
           ),
           const SizedBox(height: 10),
-          const Text('Level Up Your Tech Career 🚀',
+          Text('Level Up Your Tech Career 🚀',
               style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: c.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          const Text('Premium removes all ads and unlocks all tracks.',
-              style:
-                  TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          Text('Premium removes all ads and unlocks all tracks.',
+              style: TextStyle(color: c.textSecondary, fontSize: 13)),
           const SizedBox(height: 12),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: NexColors.primary,
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Text('Go Premium — \$9.99/month',

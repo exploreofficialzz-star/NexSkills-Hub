@@ -30,7 +30,7 @@ class _PathsScreenState extends State<PathsScreen> {
   }
 
   Future<void> _loadPaths() async {
-    setState(() => _loading = true);
+    if (mounted) setState(() => _loading = true);
     final paths = await PathService.byCategory(_selectedCategory);
     if (mounted) {
       setState(() {
@@ -47,17 +47,25 @@ class _PathsScreenState extends State<PathsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      // ← transparent lets IndexedStack background show through,
+      //   preventing the gray Material surface tint rectangle
+      backgroundColor: c.background,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
-            _buildCategoryBar(),
+            _buildHeader(c),
+            const SizedBox(height: 4),
+            _buildCategoryBar(c),
+            const SizedBox(height: 8),
             Expanded(
               child: _loading
-                  ? const ShimmerList(count: 3)
-                  : _buildPathList(),
+                  ? ShimmerList(count: 3)
+                  : _paths.isEmpty
+                      ? _buildEmpty(c)
+                      : _buildPathList(c),
             ),
           ],
         ),
@@ -65,33 +73,26 @@ class _PathsScreenState extends State<PathsScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(NexColors c) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('My Learning Path',
-                    style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5)),
-                Text('Structured. Sequential. Effective.',
-                    style: TextStyle(
-                        color: AppColors.textMuted, fontSize: 13)),
-              ],
-            ),
-          ),
+          Text('My Learning Path',
+              style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5)),
+          Text('Structured. Sequential. Effective.',
+              style: TextStyle(color: c.textMuted, fontSize: 13)),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryBar() {
+  Widget _buildCategoryBar(NexColors c) {
     return SizedBox(
       height: 44,
       child: ListView.separated(
@@ -106,18 +107,19 @@ class _PathsScreenState extends State<PathsScreen> {
             onTap: () => _selectCategory(cat.id),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: selected ? cat.color : AppColors.card,
+                color: selected ? cat.color : c.card,
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: selected ? cat.color : c.border,
+                  width: 0.5,
+                ),
               ),
               child: Text(
                 '${cat.icon} ${cat.title.split(' ').first}',
                 style: TextStyle(
-                  color: selected
-                      ? Colors.white
-                      : AppColors.textMuted,
+                  color: selected ? Colors.white : c.textMuted,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -129,22 +131,39 @@ class _PathsScreenState extends State<PathsScreen> {
     );
   }
 
-  Widget _buildPathList() {
+  Widget _buildEmpty(NexColors c) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('📚', style: TextStyle(fontSize: 48)),
+          const SizedBox(height: 16),
+          Text('No paths yet',
+              style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text('Learning paths for this track are coming soon.',
+              style: TextStyle(color: c.textMuted, fontSize: 13),
+              textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPathList(NexColors c) {
     return ListView.builder(
-      padding: const EdgeInsets.all(20),
+      // ← crucial: transparent background prevents the gray tint rect
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       itemCount: _paths.length,
       itemBuilder: (_, i) {
         final path = _paths[i];
-        final progress = _progress!;
-        final completed = progress.completedCount(path.id);
-        final isLocked = path.prerequisitePathId != null &&
-            progress.completedCount(path.prerequisitePathId!) <
-                (PathService.getById(path.prerequisitePathId!).then(
-                    (p) => p?.totalSteps ?? 0) as dynamic);
+        final completed = _progress!.completedCount(path.id);
         return _PathCard(
           path: path,
           completedSteps: completed,
-          isLocked: false, // simplified, full lock logic in detail
+          isLocked: false,
           onTap: () {
             AdService.showInterstitial(onDismissed: () {
               if (mounted) {
@@ -153,8 +172,8 @@ class _PathsScreenState extends State<PathsScreen> {
                   MaterialPageRoute(
                     builder: (_) => PathDetailScreen(
                       path: path,
-                      onStepComplete: () => setState(
-                          () => _progress = HiveService.getProgress()),
+                      onStepComplete: () =>
+                          setState(() => _progress = HiveService.getProgress()),
                     ),
                   ),
                 );
@@ -167,6 +186,7 @@ class _PathsScreenState extends State<PathsScreen> {
   }
 }
 
+// ─── Path Card ────────────────────────────────────────────────────────────────
 class _PathCard extends StatelessWidget {
   final LearningPath path;
   final int completedSteps;
@@ -180,34 +200,24 @@ class _PathCard extends StatelessWidget {
     required this.onTap,
   });
 
-  Color get _levelColor {
-    switch (path.level) {
-      case 'beginner':
-        return AppColors.success;
-      case 'intermediate':
-        return AppColors.warning;
-      default:
-        return AppColors.error;
-    }
-  }
+  Color get _levelColor => switch (path.level) {
+        'beginner'     => NexColors.success,
+        'intermediate' => NexColors.warning,
+        _              => NexColors.error,
+      };
 
-  String get _levelEmoji {
-    switch (path.level) {
-      case 'beginner':
-        return '🟢';
-      case 'intermediate':
-        return '🟡';
-      default:
-        return '🔴';
-    }
-  }
+  String get _levelEmoji => switch (path.level) {
+        'beginner'     => '🟢',
+        'intermediate' => '🟡',
+        _              => '🔴',
+      };
 
   @override
   Widget build(BuildContext context) {
-    final progress = path.totalSteps > 0
-        ? completedSteps / path.totalSteps
-        : 0.0;
-    final isComplete = completedSteps >= path.totalSteps;
+    final c = context.colors;
+    final progressVal =
+        path.totalSteps > 0 ? completedSteps / path.totalSteps : 0.0;
+    final isComplete = completedSteps >= path.totalSteps && path.totalSteps > 0;
 
     return GestureDetector(
       onTap: isLocked ? null : onTap,
@@ -215,23 +225,26 @@ class _PathCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isLocked ? AppColors.locked : AppColors.card,
+          color: isLocked ? c.surface : c.card,
           borderRadius: BorderRadius.circular(20),
-          border: isComplete
-              ? Border.all(color: AppColors.accent, width: 1.5)
-              : null,
+          border: Border.all(
+            color: isComplete
+                ? NexColors.accent
+                : c.border,
+            width: isComplete ? 1.5 : 0.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Level badge row
             Row(
               children: [
-                Text('$_levelEmoji',
-                    style: const TextStyle(fontSize: 20)),
+                Text(_levelEmoji, style: const TextStyle(fontSize: 20)),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
                     color: _levelColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -247,35 +260,34 @@ class _PathCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 if (isLocked)
-                  const Icon(Icons.lock,
-                      color: AppColors.textMuted, size: 18)
+                  Icon(Icons.lock, color: c.textMuted, size: 18)
                 else if (isComplete)
                   const Icon(Icons.check_circle,
-                      color: AppColors.accent, size: 22),
+                      color: NexColors.accent, size: 22),
               ],
             ),
             const SizedBox(height: 12),
+
+            // Title + desc
             Text(path.title,
                 style: TextStyle(
-                    color: isLocked
-                        ? AppColors.textMuted
-                        : AppColors.textPrimary,
+                    color: isLocked ? c.textMuted : c.textPrimary,
                     fontSize: 20,
                     fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             Text(path.description,
-                style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                    height: 1.4)),
+                style: TextStyle(
+                    color: c.textMuted, fontSize: 13, height: 1.4)),
             const SizedBox(height: 16),
+
+            // Progress bar
             if (!isLocked) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  backgroundColor: AppColors.surface,
-                  color: isComplete ? AppColors.accent : AppColors.primary,
+                  value: progressVal.clamp(0.0, 1.0),
+                  backgroundColor: c.progressTrack,
+                  color: isComplete ? NexColors.accent : NexColors.primary,
                   minHeight: 6,
                 ),
               ),
@@ -285,9 +297,7 @@ class _PathCard extends StatelessWidget {
                     ? '✅ Completed!'
                     : '$completedSteps / ${path.totalSteps} lessons',
                 style: TextStyle(
-                    color: isComplete
-                        ? AppColors.accent
-                        : AppColors.textMuted,
+                    color: isComplete ? NexColors.accent : c.textMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w600),
               ),
