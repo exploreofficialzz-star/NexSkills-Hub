@@ -325,20 +325,20 @@ void main() {
         expect(p.canShowInterstitial, isTrue);
       });
 
-      test('returns false within the 180-second cooldown window', () {
+      test('returns false within the 90-second cooldown window', () {
         final recent = DateTime.now().subtract(const Duration(seconds: 60));
         final p = _makeProgress(lastInterstitialShown: recent);
         expect(p.canShowInterstitial, isFalse);
       });
 
-      test('returns true after the 180-second cooldown has elapsed', () {
-        final old = DateTime.now().subtract(const Duration(seconds: 200));
+      test('returns true after the 90-second cooldown has elapsed', () {
+        final old = DateTime.now().subtract(const Duration(seconds: 100));
         final p = _makeProgress(lastInterstitialShown: old);
         expect(p.canShowInterstitial, isTrue);
       });
 
-      test('returns false at exactly 179 seconds elapsed', () {
-        final recent = DateTime.now().subtract(const Duration(seconds: 179));
+      test('returns false at exactly 89 seconds elapsed', () {
+        final recent = DateTime.now().subtract(const Duration(seconds: 89));
         final p = _makeProgress(lastInterstitialShown: recent);
         expect(p.canShowInterstitial, isFalse);
       });
