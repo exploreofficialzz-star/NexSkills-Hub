@@ -1,36 +1,43 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart'; // ← fixes BuildContext + MediaQuery
+import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../constants/app_constants.dart';
 import 'hive_service.dart';
 
-/// AdService — Policy-compliant aggressive ad strategy
+/// AdService — Aggressive but fully policy-compliant ad strategy
 ///
-/// Google AdMob policies observed:
-///  • Interstitials: min 60s between shows (we use 90s). Never on back-press.
-///    Never auto-triggered without user action. Never on app open first launch.
-///  • Rewarded: always user-initiated. Never required for core features.
-///  • Banners: no fake close buttons. No overlapping interactive content.
-///  • No ads shown to users under 13 (COPPA). Child-directed = false.
-///  • All ads must be closeable / skippable per platform timers.
+/// Interstitial policy (Google):
+///  • Min 60 seconds between shows → we use 90s (safety margin)
+///  • Never on back-press or back navigation
+///  • Never auto-triggered; always tied to a user navigation action
+///  • Not shown on app first launch / onboarding
 ///
-/// Revenue levers wired:
-///  1. Adaptive banner ads on Today + Explore (free users, higher eCPM)
-///  2. Interstitial before every content open (90s cooldown)
-///  3. Rewarded: streak-save, bonus lesson, article-limit unlock
-///  4. App-open ad on cold resume after 30+ min away
+/// Session dedup rule (UX + policy best practice):
+///  • Each content item (by ID) shows an interstitial AT MOST ONCE per
+///    app session. Repeat opens of the same content skip the ad.
+///  • The 90s cooldown is ALSO enforced, so whichever gate fires first wins.
+///
+/// Ad placements:
+///  1. Adaptive banner — content viewer (below video info), Explore, Today
+///  2. Interstitial — before opening content (once/item/session + 90s cooldown)
+///  3. Rewarded — streak save, bonus lesson, article-limit unlock
+///  4. App-open — cold resume after 30+ min away
 
 class AdService {
-  static InterstitialAd? _interstitialAd;
-  static RewardedAd?     _rewardedAd;
-  static AppOpenAd?      _appOpenAd;
+  // ─── Session interstitial dedup ───────────────────────────────
+  // Cleared when app comes back from a long background (AdLifecycleObserver)
+  static final Set<String> _shownThisSession = {};
+
+  static InterstitialAd?  _interstitialAd;
+  static RewardedAd?      _rewardedAd;
+  static AppOpenAd?       _appOpenAd;
   static bool _interstitialLoading = false;
   static bool _rewardedLoading     = false;
   static bool _appOpenLoading      = false;
   static DateTime? _appOpenLoadedAt;
 
-  // ─── IDs ─────────────────────────────────────────────────────
+  // ─── Ad unit IDs ──────────────────────────────────────────────
   static String get _bannerId =>
       Platform.isIOS ? AdConstants.iosBannerId : AdConstants.androidBannerId;
   static String get _interstitialId =>
@@ -55,8 +62,7 @@ class AdService {
 
   static const AdRequest _request = AdRequest();
 
-  // ─── ADAPTIVE BANNER ─────────────────────────────────────────
-  /// Higher eCPM than fixed banner — fills full device width.
+  // ─── ADAPTIVE BANNER ──────────────────────────────────────────
   static Future<BannerAd> createAdaptiveBanner(BuildContext context) async {
     final width = MediaQuery.of(context).size.width.truncate();
     final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
@@ -68,7 +74,6 @@ class AdService {
     );
   }
 
-  /// Fallback standard banner (when context not available at call site)
   static BannerAd createBanner() => BannerAd(
     adUnitId: _bannerId,
     size: AdSize.banner,
@@ -94,27 +99,54 @@ class AdService {
     );
   }
 
-  /// Show interstitial before content navigation.
-  /// Always calls [onDismissed] — navigation is never blocked if ad fails.
-  static Future<bool> showInterstitial({VoidCallback? onDismissed}) async {
+  /// Show interstitial before navigating to content.
+  ///
+  /// [contentId] — unique ID of the content item (resource.id / step.url).
+  ///   If provided, the interstitial only shows ONCE per session for that item.
+  ///   Pass null for non-content navigation (e.g. opening Premium screen).
+  ///
+  /// [onDismissed] — always called regardless of whether the ad showed,
+  ///   so navigation is NEVER blocked.
+  static Future<bool> showInterstitial({
+    String? contentId,
+    VoidCallback? onDismissed,
+  }) async {
     final progress = HiveService.getProgress();
+
+    // Gate 1: premium users never see ads
     if (progress.isPremium) { onDismissed?.call(); return false; }
+
+    // Gate 2: session dedup — same content item only gets one interstitial
+    if (contentId != null && _shownThisSession.contains(contentId)) {
+      onDismissed?.call();
+      return false;
+    }
+
+    // Gate 3: 90s cooldown between any interstitials
     if (!progress.canShowInterstitial) { onDismissed?.call(); return false; }
+
+    // Gate 4: ad not loaded yet
     if (_interstitialAd == null) {
       _preloadInterstitial();
       onDismissed?.call();
       return false;
     }
+
+    // All gates passed — mark this item as shown for the session
+    if (contentId != null) _shownThisSession.add(contentId);
+
     _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose(); _interstitialAd = null; _preloadInterstitial();
-        HiveService.recordInterstitialShown(); onDismissed?.call();
+        HiveService.recordInterstitialShown();
+        onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
         ad.dispose(); _interstitialAd = null; _preloadInterstitial();
         onDismissed?.call();
       },
     );
+
     await _interstitialAd!.show();
     return true;
   }
@@ -133,13 +165,13 @@ class AdService {
     );
   }
 
-  /// Policy compliant: reward only granted inside [onRewarded], never automatically.
+  /// Policy: reward only granted inside [onRewarded], never automatically.
+  /// Always user-initiated — never required for core features.
   static Future<bool> showRewarded({
     required void Function(RewardItem reward) onRewarded,
     VoidCallback? onDismissed,
   }) async {
-    final progress = HiveService.getProgress();
-    if (progress.isPremium) return false;
+    if (HiveService.getProgress().isPremium) return false;
     if (_rewardedAd == null) { _preloadRewarded(); return false; }
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
@@ -170,15 +202,13 @@ class AdService {
     );
   }
 
-  static bool get _appOpenIsValid {
-    if (_appOpenAd == null || _appOpenLoadedAt == null) return false;
-    return DateTime.now().difference(_appOpenLoadedAt!).inHours < 4;
-  }
+  static bool get _appOpenIsValid =>
+      _appOpenAd != null &&
+      _appOpenLoadedAt != null &&
+      DateTime.now().difference(_appOpenLoadedAt!).inHours < 4;
 
-  /// Call from AppLifecycleListener onResume. Only shows after 30min in background.
   static Future<void> showAppOpenIfReady() async {
-    final progress = HiveService.getProgress();
-    if (progress.isPremium) return;
+    if (HiveService.getProgress().isPremium) return;
     if (!_appOpenIsValid) { _preloadAppOpen(); return; }
     _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
@@ -198,14 +228,20 @@ class AdService {
   }
 }
 
-// ─── App lifecycle watcher for app-open ads ───────────────────────────────────
+// ─── App lifecycle observer ───────────────────────────────────────────────────
 class AdLifecycleObserver {
   static DateTime? _backgroundedAt;
+
   static void onPause() => _backgroundedAt = DateTime.now();
+
   static Future<void> onResume() async {
     if (_backgroundedAt == null) return;
-    final away = DateTime.now().difference(_backgroundedAt!).inSeconds;
-    if (away > 1800) await AdService.showAppOpenIfReady();
+    final awaySeconds = DateTime.now().difference(_backgroundedAt!).inSeconds;
+    if (awaySeconds > 1800) {
+      // Clear session dedup after 30 min away — fresh session
+      AdService._shownThisSession.clear();
+      await AdService.showAppOpenIfReady();
+    }
     _backgroundedAt = null;
   }
 }

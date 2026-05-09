@@ -19,7 +19,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String _selectedCategory = 'all';
   String _selectedType     = 'all';
   List<ResourceModel> _items = [];
-  bool _loading    = true;  // true on first open until cache+fetch both settle
+  bool _loading    = true;
   bool _refreshing = false;
   String? _error;
 
@@ -55,7 +55,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     if (mounted) {
       setState(() {
         _items = cached;
-        // only clear loading flag if we have something to show
         if (cached.isNotEmpty) _loading = false;
       });
     }
@@ -69,15 +68,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _loadFromCache();
       final after = _items.length;
       if (after - before > 0 && mounted) {
-        try {
-          await NotificationService.showNewContentNotification(
-              'tech', after - before);
-        } catch (_) {}
+        try { await NotificationService.showNewContentNotification('tech', after - before); }
+        catch (_) {}
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _error = 'Could not fetch content. Check your connection.');
-      }
+      if (mounted) setState(() => _error = 'Could not fetch content. Check your connection.');
     } finally {
       if (mounted) setState(() { _refreshing = false; _loading = false; });
     }
@@ -95,15 +90,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _openResource(ResourceModel resource) {
-    AdService.showInterstitial(onDismissed: () {
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => ResourceViewerScreen(resource: resource)),
-        );
-      }
-    });
+    // Pass contentId for session dedup — same article won't trigger
+    // interstitial again within the same app session
+    AdService.showInterstitial(
+      contentId: resource.id,
+      onDismissed: () {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => ResourceViewerScreen(resource: resource)),
+          );
+        }
+      },
+    );
   }
 
   Future<void> _toggleBookmark(ResourceModel r) async {
@@ -150,10 +150,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
               children: [
                 Text('Explore',
                     style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.8)),
+                        color: c.textPrimary, fontSize: 28,
+                        fontWeight: FontWeight.w800, letterSpacing: -0.8)),
                 Text('Fresh content from top sources',
                     style: TextStyle(color: c.textMuted, fontSize: 13)),
               ],
@@ -161,15 +159,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
           _refreshing
               ? SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 20, height: 20,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: NexColors.primary),
-                )
+                      strokeWidth: 2, color: NexColors.primary))
               : GestureDetector(
                   onTap: _fetchFresh,
-                  child: Icon(Icons.refresh, color: c.textMuted),
-                ),
+                  child: Icon(Icons.refresh, color: c.textMuted)),
         ],
       ),
     );
@@ -182,17 +177,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
         children: [
           const Icon(Icons.wifi_off, color: NexColors.error, size: 14),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(_error!,
-                style:
-                    const TextStyle(color: NexColors.error, fontSize: 12)),
-          ),
+          Expanded(child: Text(_error!,
+              style: const TextStyle(color: NexColors.error, fontSize: 12))),
           GestureDetector(
             onTap: _fetchFresh,
             child: const Text('Retry',
-                style: TextStyle(
-                    color: NexColors.primary,
-                    fontSize: 12,
+                style: TextStyle(color: NexColors.primary, fontSize: 12,
                     fontWeight: FontWeight.w700)),
           ),
         ],
@@ -212,27 +202,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
           final cat = _categories[i];
           final selected = _selectedCategory == cat.$1;
           return GestureDetector(
-            onTap: () => setState(() {
-              _selectedCategory = cat.$1;
-            }),
+            onTap: () => setState(() => _selectedCategory = cat.$1),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: selected ? NexColors.primary : c.card,
                 borderRadius: BorderRadius.circular(10),
-                border:
-                    Border.all(color: selected ? NexColors.primary : c.border, width: 0.5),
+                border: Border.all(
+                    color: selected ? NexColors.primary : c.border, width: 0.5),
               ),
-              child: Text(
-                '${cat.$2} ${cat.$3}',
-                style: TextStyle(
-                  color: selected ? Colors.white : c.textMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: Text('${cat.$2} ${cat.$3}',
+                  style: TextStyle(
+                    color: selected ? Colors.white : c.textMuted,
+                    fontSize: 13, fontWeight: FontWeight.w600)),
             ),
           );
         },
@@ -252,27 +235,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
               onTap: () => setState(() => _selectedType = t.$1),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: selected
-                      ? NexColors.accent.withOpacity(0.12)
-                      : Colors.transparent,
+                  color: selected ? NexColors.accent.withOpacity(0.12) : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: selected
-                        ? NexColors.accent
-                        : c.textMuted.withOpacity(0.3),
-                  ),
+                    color: selected ? NexColors.accent : c.textMuted.withOpacity(0.3)),
                 ),
-                child: Text(
-                  t.$2,
-                  style: TextStyle(
-                    color: selected ? NexColors.accent : c.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: Text(t.$2,
+                    style: TextStyle(
+                      color: selected ? NexColors.accent : c.textMuted,
+                      fontSize: 12, fontWeight: FontWeight.w600)),
               ),
             ),
           );
@@ -285,7 +258,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final items = _filtered;
 
     if (items.isEmpty) {
-      // AlwaysScrollableScrollPhysics = pull-to-refresh works even when empty
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
@@ -296,9 +268,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 const Text('📡', style: TextStyle(fontSize: 52)),
                 const SizedBox(height: 16),
                 Text('No content yet',
-                    style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 18,
+                    style: TextStyle(color: c.textPrimary, fontSize: 18,
                         fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
                 Text('Pull down to fetch latest content',
@@ -311,10 +281,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     final progress = HiveService.getProgress();
+
+    // ── Build list with ads every 4 content items ─────────────
+    // Policy: ads clearly separated from content, no fake UI elements
     final withAds = <dynamic>[];
-    for (int i = 0; i < items.length; i++) {
-      withAds.add(items[i]);
-      if (!progress.isPremium && (i + 1) % 3 == 0) {
+    int contentCount = 0;
+    for (final item in items) {
+      withAds.add(item);
+      contentCount++;
+      // Insert ad slot after every 4th content item (not every 3)
+      if (!progress.isPremium && contentCount % 4 == 0) {
         withAds.add('ad');
       }
     }
@@ -325,7 +301,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       itemCount: withAds.length,
       itemBuilder: (_, i) {
         final item = withAds[i];
-        if (item == 'ad') return _NativeAdPlaceholder(c: c);
+        if (item == 'ad') return _InListAdSlot(c: c);
         final resource = item as ResourceModel;
         return ResourceCard(
           resource: resource,
@@ -337,58 +313,74 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 }
 
-// ─── Native ad placeholder ────────────────────────────────────────────────────
-class _NativeAdPlaceholder extends StatelessWidget {
+// ─── In-list ad slot (every 4 items) ─────────────────────────────────────────
+// Uses AdaptiveBannerWidget. Clearly labelled "Advertisement" — policy compliant.
+class _InListAdSlot extends StatefulWidget {
   final NexColors c;
-  const _NativeAdPlaceholder({required this.c});
+  const _InListAdSlot({required this.c});
+
+  @override
+  State<_InListAdSlot> createState() => _InListAdSlotState();
+}
+
+class _InListAdSlotState extends State<_InListAdSlot> {
+  BannerAd? _ad;
+  bool _loaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_ad == null) _load();
+  }
+
+  Future<void> _load() async {
+    final ad = await AdService.createAdaptiveBanner(context);
+    await ad.load();
+    if (mounted) setState(() { _ad = ad; _loaded = true; });
+  }
+
+  @override
+  void dispose() { _ad?.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
+    final c = widget.c;
+    if (!_loaded || _ad == null) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        height: 60,
+        decoration: BoxDecoration(
+          color: c.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: c.border, width: 0.5),
+        ),
+        child: Center(
+          child: Text('Advertisement',
+              style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5)),
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: c.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: NexColors.primary.withOpacity(0.2)),
+        color: c.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.border, width: 0.5),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: NexColors.warning.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Text('Sponsored',
-                style: TextStyle(
-                    color: NexColors.warning,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text('Advertisement',
+                style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5)),
           ),
-          const SizedBox(height: 10),
-          Text('Level Up Your Tech Career 🚀',
-              style: TextStyle(
-                  color: c.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700)),
+          SizedBox(
+            width: _ad!.size.width.toDouble(),
+            height: _ad!.size.height.toDouble(),
+            child: AdWidget(ad: _ad!),
+          ),
           const SizedBox(height: 4),
-          Text('Premium removes all ads and unlocks all tracks.',
-              style: TextStyle(color: c.textSecondary, fontSize: 13)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: NexColors.primary,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Text('Go Premium — \$9.99/month',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
-          ),
         ],
       ),
     );

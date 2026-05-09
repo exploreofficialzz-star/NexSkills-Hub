@@ -56,18 +56,19 @@ class UserProgress extends HiveObject {
   })  : completedSteps = completedSteps ?? {},
         earnedBadges = earnedBadges ?? [];
 
-  bool isStepCompleted(String pathId, int stepOrder) {
-    return completedSteps[pathId]?.contains(stepOrder) ?? false;
-  }
+  bool isStepCompleted(String pathId, int stepOrder) =>
+      completedSteps[pathId]?.contains(stepOrder) ?? false;
 
-  int completedCount(String pathId) {
-    return completedSteps[pathId]?.length ?? 0;
-  }
+  int completedCount(String pathId) =>
+      completedSteps[pathId]?.length ?? 0;
 
+  /// Policy-compliant interstitial gate.
+  /// 90s cooldown (AdMob policy minimum is 60s; 90s gives a safety margin).
+  /// Premium users never see ads.
   bool get canShowInterstitial {
     if (isPremium) return false;
     if (lastInterstitialShown == null) return true;
-    final diff = DateTime.now().difference(lastInterstitialShown!);
-    return diff.inSeconds >= 180;
+    final elapsed = DateTime.now().difference(lastInterstitialShown!).inSeconds;
+    return elapsed >= 90; // matches AdConstants.interstitialCooldownSeconds
   }
 }

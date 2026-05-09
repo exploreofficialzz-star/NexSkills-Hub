@@ -18,7 +18,8 @@ class ContentSource {
 
 class AppSources {
   static const List<ContentSource> all = [
-    // ─── AI & PROMPT ENGINEERING ───────────────────────────────
+
+    // ─── AI & PROMPT ENGINEERING ────────────────────────────────
     ContentSource(
       name: 'Andrej Karpathy',
       type: SourceType.youtube,
@@ -48,6 +49,13 @@ class AppSources {
       icon: '🤖',
     ),
     ContentSource(
+      name: 'Matt Wolfe',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCmjHroN8yvuAFsNsNgnLghg',
+      category: 'ai',
+      icon: '🤖',
+    ),
+    ContentSource(
       name: 'Towards Data Science',
       type: SourceType.blog,
       feedUrl: 'https://towardsdatascience.com/feed',
@@ -55,14 +63,21 @@ class AppSources {
       icon: '📝',
     ),
     ContentSource(
-      name: 'The Batch - DeepLearning.AI',
+      name: 'DeepLearning.AI Blog',
       type: SourceType.blog,
       feedUrl: 'https://www.deeplearning.ai/the-batch/feed/',
       category: 'ai',
       icon: '📝',
     ),
+    ContentSource(
+      name: 'OpenAI Blog',
+      type: SourceType.blog,
+      feedUrl: 'https://openai.com/news/rss.xml',
+      category: 'ai',
+      icon: '📝',
+    ),
 
-    // ─── CYBERSECURITY ─────────────────────────────────────────
+    // ─── CYBERSECURITY ──────────────────────────────────────────
     ContentSource(
       name: 'NetworkChuck',
       type: SourceType.youtube,
@@ -85,6 +100,13 @@ class AppSources {
       icon: '🔐',
     ),
     ContentSource(
+      name: 'David Bombal',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCP7WmQ_U4GB3K51Od9QvM0w',
+      category: 'cybersecurity',
+      icon: '🔐',
+    ),
+    ContentSource(
       name: 'Krebs on Security',
       type: SourceType.blog,
       feedUrl: 'https://krebsonsecurity.com/feed/',
@@ -98,15 +120,16 @@ class AppSources {
       category: 'cybersecurity',
       icon: '📝',
     ),
-
-    // ─── NO-CODE / LOW-CODE ────────────────────────────────────
     ContentSource(
-      name: 'Bubble Official',
-      type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCBDDRuoU9bFNGGaW5ZPsHPQ',
-      category: 'nocode',
-      icon: '⚡',
+      name: 'Dark Reading',
+      type: SourceType.blog,
+      feedUrl: 'https://www.darkreading.com/rss.xml',
+      category: 'cybersecurity',
+      icon: '📝',
     ),
+
+    // ─── NO-CODE / LOW-CODE ─────────────────────────────────────
+    // Fixed: previous Bubble channel ID was wrong; replaced with verified IDs
     ContentSource(
       name: 'Webflow',
       type: SourceType.youtube,
@@ -122,14 +145,36 @@ class AppSources {
       icon: '⚡',
     ),
     ContentSource(
-      name: 'No Code MBA Blog',
+      name: 'Liam Ottley',
+      type: SourceType.youtube,
+      // AI automations & no-code AI tools — very active channel
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCqiLJ2A0TB4ZABMqy3jqSlg',
+      category: 'nocode',
+      icon: '⚡',
+    ),
+    ContentSource(
+      name: 'Mike Schiemer — No Code',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCjX0FtIZBBVD3YoCL2-nFpw',
+      category: 'nocode',
+      icon: '⚡',
+    ),
+    ContentSource(
+      name: 'Zapier Blog',
       type: SourceType.blog,
-      feedUrl: 'https://www.nocode.mba/rss.xml',
+      feedUrl: 'https://zapier.com/blog/feeds/latest/',
+      category: 'nocode',
+      icon: '📝',
+    ),
+    ContentSource(
+      name: 'Makerpad (Webflow Blog)',
+      type: SourceType.blog,
+      feedUrl: 'https://webflow.com/blog/rss.xml',
       category: 'nocode',
       icon: '📝',
     ),
 
-    // ─── DATA & ANALYTICS ──────────────────────────────────────
+    // ─── DATA & ANALYTICS ───────────────────────────────────────
     ContentSource(
       name: 'Alex The Analyst',
       type: SourceType.youtube,
@@ -158,8 +203,15 @@ class AppSources {
       category: 'data',
       icon: '📝',
     ),
+    ContentSource(
+      name: 'Towards AI',
+      type: SourceType.blog,
+      feedUrl: 'https://towardsai.net/feed',
+      category: 'data',
+      icon: '📝',
+    ),
 
-    // ─── CLOUD & DEVOPS ────────────────────────────────────────
+    // ─── CLOUD & DEVOPS ─────────────────────────────────────────
     ContentSource(
       name: 'TechWorld with Nana',
       type: SourceType.youtube,
@@ -182,6 +234,13 @@ class AppSources {
       icon: '☁️',
     ),
     ContentSource(
+      name: 'Kunal Kushwaha',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCBGORDCOnqqVJOCFoFPVkHg',
+      category: 'cloud',
+      icon: '☁️',
+    ),
+    ContentSource(
       name: 'AWS Blog',
       type: SourceType.blog,
       feedUrl: 'https://aws.amazon.com/blogs/aws/feed/',
@@ -192,6 +251,13 @@ class AppSources {
       name: 'Google Cloud Blog',
       type: SourceType.blog,
       feedUrl: 'https://cloudblog.withgoogle.com/rss/',
+      category: 'cloud',
+      icon: '📝',
+    ),
+    ContentSource(
+      name: 'Azure DevOps Blog',
+      type: SourceType.blog,
+      feedUrl: 'https://devblogs.microsoft.com/devops/feed/',
       category: 'cloud',
       icon: '📝',
     ),
