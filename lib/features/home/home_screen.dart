@@ -6,67 +6,198 @@ import '../explore/explore_screen.dart';
 import '../progress/progress_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final void Function(ThemeMode)? onThemeModeChanged;
+  const HomeScreen({super.key, this.onThemeModeChanged});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
+  late AnimationController _navController;
 
-  final _screens = const [
-    TodayScreen(),
-    PathsScreen(),
-    ExploreScreen(),
-    ProgressScreen(),
+  final _items = const [
+    _NavItem(icon: Icons.today_outlined,     activeIcon: Icons.today,      label: 'Today'),
+    _NavItem(icon: Icons.route_outlined,     activeIcon: Icons.route,      label: 'My Path'),
+    _NavItem(icon: Icons.explore_outlined,   activeIcon: Icons.explore,    label: 'Explore'),
+    _NavItem(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart,  label: 'Progress'),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _navController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+  }
+
+  @override
+  void dispose() {
+    _navController.dispose();
+    super.dispose();
+  }
+
+  void _onTap(int i) {
+    if (i == _currentIndex) return;
+    setState(() => _currentIndex = i);
+    _navController.forward(from: 0);
+  }
+
+  Widget _buildScreen(int i) => switch (i) {
+        0 => const TodayScreen(),
+        1 => const PathsScreen(),
+        2 => const ExploreScreen(),
+        3 => ProgressScreen(onThemeModeChanged: widget.onThemeModeChanged),
+        _ => const TodayScreen(),
+      };
+
+  @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: c.background,
+      // extendBody lets the content scroll under the floating nav
+      extendBody: true,
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: List.generate(4, _buildScreen),
       ),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: _FloatingNav(
+        currentIndex: _currentIndex,
+        items: _items,
+        onTap: _onTap,
+        controller: _navController,
+      ),
+    );
+  }
+}
+
+// ─── Floating nav bar ─────────────────────────────────────────────────────────
+class _FloatingNav extends StatelessWidget {
+  final int currentIndex;
+  final List<_NavItem> items;
+  final void Function(int) onTap;
+  final AnimationController controller;
+
+  const _FloatingNav({
+    required this.currentIndex,
+    required this.items,
+    required this.onTap,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final isDark = context.isDark;
+
+    return Padding(
+      // Space below nav: 16px gap from screen edge
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: Container(
+        height: 64,
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border(
-            top: BorderSide(
-              color: AppColors.card,
-              width: 1,
+          color: c.navBackground,
+          borderRadius: BorderRadius.circular(32), // pill / edge-curved rect
+          border: Border.all(color: c.navBorder, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withOpacity(0.5)
+                  : Colors.black.withOpacity(0.10),
+              blurRadius:   24,
+              spreadRadius: 0,
+              offset:       const Offset(0, 8),
             ),
-          ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.today_outlined),
-              activeIcon: Icon(Icons.today),
-              label: 'Today',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.route_outlined),
-              activeIcon: Icon(Icons.route),
-              label: 'My Path',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.explore_outlined),
-              activeIcon: Icon(Icons.explore),
-              label: 'Explore',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart_outlined),
-              activeIcon: Icon(Icons.bar_chart),
-              label: 'Progress',
+            BoxShadow(
+              color: NexColors.primary.withOpacity(0.08),
+              blurRadius:   16,
+              spreadRadius: 0,
+              offset:       const Offset(0, 4),
             ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: Row(
+            children: List.generate(items.length, (i) {
+              final selected = i == currentIndex;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onTap(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeInOut,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Animated icon with scale bounce
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 1, end: selected ? 1.18 : 1),
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.elasticOut,
+                          builder: (_, scale, child) =>
+                              Transform.scale(scale: scale, child: child),
+                          child: Icon(
+                            selected
+                                ? items[i].activeIcon
+                                : items[i].icon,
+                            color: selected
+                                ? NexColors.primary
+                                : c.textMuted,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 180),
+                          style: TextStyle(
+                            color: selected
+                                ? NexColors.primary
+                                : c.textMuted,
+                            fontSize:   10,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                          child: Text(items[i].label),
+                        ),
+                        // Active dot
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          margin: const EdgeInsets.only(top: 3),
+                          width:  selected ? 4 : 0,
+                          height: selected ? 4 : 0,
+                          decoration: const BoxDecoration(
+                            color: NexColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
         ),
       ),
     );
   }
+}
+
+class _NavItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
 }

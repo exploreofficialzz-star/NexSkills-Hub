@@ -15,47 +15,74 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-  ));
-
   await HiveService.init();
   await AdService.initialize();
-
-  try {
-    await NotificationService.init();
-  } catch (_) {}
+  try { await NotificationService.init(); } catch (_) {}
 
   final progress = HiveService.getProgress();
-
-  // Fixed: original had operator precedence bug:
-  //   activeCategory.isNotEmpty && lastActiveDate != null || totalXP > 0 ...
-  // was parsed as:
-  //   (activeCategory.isNotEmpty && lastActiveDate != null) || totalXP > 0 ...
-  // A fresh user who just completed onboarding has activeCategory set but
-  // lastActiveDate == null → first clause false → always went to onboarding.
-  // Fix: parenthesise the OR clauses and check activeCategory alone.
   final isOnboarded = progress.activeCategory.isNotEmpty &&
       (progress.lastActiveDate != null ||
           progress.totalXP > 0 ||
           progress.totalLessonsCompleted > 0 ||
-          progress.dailyGoalMinutes != 20); // non-default goal means user chose one
+          progress.dailyGoalMinutes != 20);
 
   runApp(NexSkillsApp(isOnboarded: isOnboarded));
 }
 
-class NexSkillsApp extends StatelessWidget {
+class NexSkillsApp extends StatefulWidget {
   final bool isOnboarded;
   const NexSkillsApp({super.key, required this.isOnboarded});
 
   @override
+  State<NexSkillsApp> createState() => _NexSkillsAppState();
+}
+
+class _NexSkillsAppState extends State<NexSkillsApp> {
+  // Reads the saved preference from Hive; falls back to system.
+  ThemeMode _themeMode = ThemeMode.system;
+
+  @override
+  void initState() {
+    super.initState();
+    final saved = HiveService.getThemeMode();
+    if (saved != null) {
+      _themeMode = saved;
+    }
+  }
+
+  void setThemeMode(ThemeMode mode) {
+    setState(() => _themeMode = mode);
+    HiveService.saveThemeMode(mode);
+    // Update status bar icons to match new theme immediately
+    _applySystemUiOverlay(mode);
+  }
+
+  void _applySystemUiOverlay(ThemeMode mode) {
+    final brightness = switch (mode) {
+      ThemeMode.dark   => Brightness.dark,
+      ThemeMode.light  => Brightness.light,
+      ThemeMode.system => WidgetsBinding
+              .instance.platformDispatcher.platformBrightness,
+    };
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor:          Colors.transparent,
+      statusBarIconBrightness: brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark,
+    ));
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'NexSkills Hub',
+      title:                   'NexSkills Hub',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      home: isOnboarded ? const HomeScreen() : const OnboardingScreen(),
+      theme:      AppTheme.light,
+      darkTheme:  AppTheme.dark,
+      themeMode:  _themeMode,
+      home: widget.isOnboarded
+          ? HomeScreen(onThemeModeChanged: setThemeMode)
+          : OnboardingScreen(onThemeModeChanged: setThemeMode),
     );
   }
 }
