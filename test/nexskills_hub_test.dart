@@ -576,8 +576,8 @@ void main() {
   });
 
   group('AdConstants', () {
-    test('cooldown is 180 seconds', () {
-      expect(AdConstants.interstitialCooldownSeconds, 180);
+    test('cooldown is 90 seconds', () {
+      expect(AdConstants.interstitialCooldownSeconds, 90);
     });
 
     test('all ad IDs are non-empty', () {
