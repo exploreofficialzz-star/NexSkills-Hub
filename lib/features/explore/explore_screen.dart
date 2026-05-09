@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/resource_model.dart';
 import '../../core/services/hive_service.dart';
