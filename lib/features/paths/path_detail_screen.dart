@@ -10,8 +10,7 @@ class PathDetailScreen extends StatefulWidget {
   final LearningPath path;
   final VoidCallback? onStepComplete;
 
-  const PathDetailScreen(
-      {super.key, required this.path, this.onStepComplete});
+  const PathDetailScreen({super.key, required this.path, this.onStepComplete});
 
   @override
   State<PathDetailScreen> createState() => _PathDetailScreenState();
@@ -27,38 +26,40 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
   }
 
   void _openStep(PathStep step) {
-    AdService.showInterstitial(onDismissed: () {
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ContentViewerScreen(
-              step: step,
-              pathId: widget.path.id,
-              onComplete: () {
-                setState(
-                    () => _progress = HiveService.getProgress());
-                widget.onStepComplete?.call();
-              },
+    AdService.showInterstitial(
+      contentId: '${widget.path.id}_${step.order}',
+      onDismissed: () {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ContentViewerScreen(
+                step: step,
+                pathId: widget.path.id,
+                onComplete: () {
+                  setState(() => _progress = HiveService.getProgress());
+                  widget.onStepComplete?.call();
+                },
+              ),
             ),
-          ),
-        );
-      }
-    });
+          );
+        }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final completed =
-        _progress.completedSteps[widget.path.id] ?? [];
+    final c = context.colors;
+    final completed = _progress.completedSteps[widget.path.id] ?? [];
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: c.background,
       body: CustomScrollView(
         slivers: [
-          _buildAppBar(),
+          _buildAppBar(c, completed),
           SliverPadding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (_, i) {
@@ -85,32 +86,34 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
     );
   }
 
-  Widget _buildAppBar() {
-    final completed =
-        (_progress.completedSteps[widget.path.id] ?? []).length;
+  Widget _buildAppBar(NexColors c, List<int> completed) {
     final total = widget.path.totalSteps;
-    final levelColor = widget.path.level == 'beginner'
-        ? AppColors.success
-        : widget.path.level == 'intermediate'
-            ? AppColors.warning
-            : AppColors.error;
+    final levelColor = switch (widget.path.level) {
+      'beginner'     => NexColors.success,
+      'intermediate' => NexColors.warning,
+      _              => NexColors.error,
+    };
 
     return SliverAppBar(
-      expandedHeight: 180,
+      expandedHeight: 200,
       pinned: true,
-      backgroundColor: AppColors.background,
+      backgroundColor: c.background,
+      iconTheme: IconThemeData(color: Colors.white),
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppColors.primary.withOpacity(0.8), AppColors.background],
+              colors: [
+                NexColors.primary.withOpacity(0.9),
+                c.background,
+              ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 60, 20, 16),
+              padding: const EdgeInsets.fromLTRB(20, 56, 20, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -118,7 +121,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: levelColor.withOpacity(0.2),
+                      color: levelColor.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -126,19 +129,37 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
                       style: TextStyle(
                           color: levelColor,
                           fontSize: 11,
-                          fontWeight: FontWeight.w700),
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(widget.path.title,
                       style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800)),
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5)),
                   const SizedBox(height: 8),
-                  Text('$completed / $total lessons complete',
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 13)),
+                  Text(
+                    '${completed.length} / $total lessons complete',
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.75),
+                        fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  // Progress bar in header
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: total > 0
+                          ? (completed.length / total).clamp(0.0, 1.0)
+                          : 0,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      color: Colors.white,
+                      minHeight: 5,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -149,6 +170,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
   }
 }
 
+// ─── Step Tile ────────────────────────────────────────────────────────────────
 class _StepTile extends StatelessWidget {
   final PathStep step;
   final bool isDone;
@@ -166,29 +188,33 @@ class _StepTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isLocked
-              ? AppColors.locked
-              : isDone
-                  ? AppColors.success.withOpacity(0.08)
-                  : AppColors.card,
+          color: isDone
+              ? NexColors.success.withOpacity(0.07)
+              : isLocked
+                  ? c.surface
+                  : c.card,
           borderRadius: BorderRadius.circular(16),
-          border: isActive
-              ? Border.all(
-                  color: AppColors.primary.withOpacity(0.5), width: 1.5)
-              : isDone
-                  ? Border.all(
-                      color: AppColors.success.withOpacity(0.3))
-                  : null,
+          border: Border.all(
+            color: isActive
+                ? NexColors.primary.withOpacity(0.5)
+                : isDone
+                    ? NexColors.success.withOpacity(0.3)
+                    : c.border,
+            width: isActive ? 1.5 : 0.5,
+          ),
         ),
         child: Row(
           children: [
-            _buildStepIcon(),
+            _buildStepIcon(c),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -197,9 +223,7 @@ class _StepTile extends StatelessWidget {
                   Text(
                     'Step ${step.order}',
                     style: TextStyle(
-                        color: isLocked
-                            ? AppColors.textMuted
-                            : AppColors.primary,
+                        color: isLocked ? c.textMuted : NexColors.primary,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.3),
@@ -208,9 +232,7 @@ class _StepTile extends StatelessWidget {
                   Text(
                     step.title,
                     style: TextStyle(
-                        color: isLocked
-                            ? AppColors.textMuted
-                            : AppColors.textPrimary,
+                        color: isLocked ? c.textMuted : c.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         height: 1.3),
@@ -218,16 +240,16 @@ class _StepTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
-                        step.isYoutube ? '📹' : '📝',
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                      Text(step.isYoutube ? '📹' : '📝',
+                          style: const TextStyle(fontSize: 12)),
                       const SizedBox(width: 4),
-                      Text(
-                        '${step.sourceName} · ${step.duration}',
-                        style: const TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 12),
+                      Expanded(
+                        child: Text(
+                          '${step.sourceName} · ${step.duration}',
+                          style: TextStyle(
+                              color: c.textMuted, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -235,10 +257,11 @@ class _StepTile extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       '💡 ${step.note}',
-                      style: const TextStyle(
-                          color: AppColors.textSecondary,
+                      style: TextStyle(
+                          color: c.textSecondary,
                           fontSize: 12,
-                          fontStyle: FontStyle.italic),
+                          fontStyle: FontStyle.italic,
+                          height: 1.4),
                     ),
                   ],
                 ],
@@ -246,41 +269,40 @@ class _StepTile extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             if (isLocked)
-              const Icon(Icons.lock_outline,
-                  color: AppColors.textMuted, size: 18)
+              Icon(Icons.lock_outline, color: c.textMuted, size: 18)
             else if (isDone)
               const Icon(Icons.check_circle,
-                  color: AppColors.success, size: 24)
+                  color: NexColors.success, size: 24)
             else
               const Icon(Icons.play_circle_outline,
-                  color: AppColors.primary, size: 24),
+                  color: NexColors.primary, size: 24),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStepIcon() {
+  Widget _buildStepIcon(NexColors c) {
     return Container(
-      width: 40,
-      height: 40,
+      width: 42,
+      height: 42,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: isDone
-            ? AppColors.success.withOpacity(0.2)
+            ? NexColors.success.withOpacity(0.15)
             : isLocked
-                ? AppColors.surface
-                : AppColors.primary.withOpacity(0.15),
+                ? c.border
+                : NexColors.primary.withOpacity(0.15),
       ),
       child: Center(
         child: Text(
           isDone ? '✓' : '${step.order}',
           style: TextStyle(
             color: isDone
-                ? AppColors.success
+                ? NexColors.success
                 : isLocked
-                    ? AppColors.textMuted
-                    : AppColors.primary,
+                    ? c.textMuted
+                    : NexColors.primary,
             fontSize: 14,
             fontWeight: FontWeight.w800,
           ),

@@ -17,7 +17,6 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Init all services in parallel where possible
   await HiveService.init();
   await Future.wait([
     AdService.initialize(),
@@ -26,11 +25,17 @@ void main() async {
   try { await NotificationService.init(); } catch (_) {}
 
   final progress = HiveService.getProgress();
+
+  // FIX: original had operator precedence bug — && binds tighter than ||
+  // so (A && B) || C || D was the actual expression.
+  // A fresh user completing onboarding has activeCategory set but
+  // lastActiveDate == null → first clause false → always fell through
+  // to onboarding even after completing it.
   final isOnboarded = progress.activeCategory.isNotEmpty &&
       (progress.lastActiveDate != null ||
           progress.totalXP > 0 ||
           progress.totalLessonsCompleted > 0 ||
-          progress.dailyGoalMinutes != 20);
+          progress.dailyGoalMinutes != 20); // non-default = user picked one
 
   runApp(NexSkillsApp(isOnboarded: isOnboarded));
 }
@@ -61,14 +66,12 @@ class _NexSkillsAppState extends State<NexSkillsApp>
     super.dispose();
   }
 
-  // ── App lifecycle → app-open ad + connectivity re-check ──────
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
       AdLifecycleObserver.onPause();
     } else if (state == AppLifecycleState.resumed) {
       AdLifecycleObserver.onResume();
-      // Re-check connectivity on resume (catches airplane mode toggled in background)
       ConnectivityService.instance.check();
     }
   }
@@ -87,10 +90,10 @@ class _NexSkillsAppState extends State<NexSkillsApp>
           WidgetsBinding.instance.platformDispatcher.platformBrightness,
     };
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor:            Colors.transparent,
+      statusBarColor:           Colors.transparent,
       statusBarIconBrightness:
           brightness == Brightness.dark ? Brightness.light : Brightness.dark,
-      systemNavigationBarColor:  Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
     ));
   }
 
@@ -102,8 +105,10 @@ class _NexSkillsAppState extends State<NexSkillsApp>
       theme:     AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _themeMode,
-      // NetworkAwareWrapper sits inside MaterialApp so it has
-      // access to Theme.of(context) for the correct color palette
+      // NetworkAwareWrapper MUST be inside MaterialApp so it has
+      // access to Theme.of(context) for correct dark/light colours.
+      // It listens to ConnectivityService.instance.stream which fires
+      // whenever connectivity changes — works throughout the full app session.
       home: NetworkAwareWrapper(
         child: widget.isOnboarded
             ? HomeScreen(onThemeModeChanged: setThemeMode)
