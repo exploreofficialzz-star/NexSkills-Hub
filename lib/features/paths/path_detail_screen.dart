@@ -36,6 +36,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
               builder: (_) => ContentViewerScreen(
                 step: step,
                 pathId: widget.path.id,
+                pathCategory: widget.path.category, // ← wired correctly
                 onComplete: () {
                   setState(() => _progress = HiveService.getProgress());
                   widget.onStepComplete?.call();
@@ -64,14 +65,14 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
               delegate: SliverChildBuilderDelegate(
                 (_, i) {
                   final step = widget.path.steps[i];
-                  final isDone = completed.contains(step.order);
+                  final isDone   = completed.contains(step.order);
                   final isLocked = !isDone &&
                       step.order > 1 &&
                       !completed.contains(step.order - 1);
 
                   return _StepTile(
                     step: step,
-                    isDone: isDone,
+                    isDone:   isDone,
                     isLocked: isLocked,
                     isActive: !isDone && !isLocked,
                     onTap: isLocked ? null : () => _openStep(step),
@@ -98,7 +99,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
       expandedHeight: 200,
       pinned: true,
       backgroundColor: c.background,
-      iconTheme: IconThemeData(color: Colors.white),
+      iconTheme: const IconThemeData(color: Colors.white),
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
@@ -127,28 +128,19 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
                     child: Text(
                       widget.path.level.toUpperCase(),
                       style: TextStyle(
-                          color: levelColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5),
+                          color: levelColor, fontSize: 11,
+                          fontWeight: FontWeight.w700, letterSpacing: 0.5),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(widget.path.title,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5)),
+                      style: const TextStyle(color: Colors.white, fontSize: 26,
+                          fontWeight: FontWeight.w800, letterSpacing: -0.5)),
                   const SizedBox(height: 8),
-                  Text(
-                    '${completed.length} / $total lessons complete',
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.75),
-                        fontSize: 13),
-                  ),
+                  Text('${completed.length} / $total lessons complete',
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.75), fontSize: 13)),
                   const SizedBox(height: 10),
-                  // Progress bar in header
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
@@ -173,9 +165,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
 // ─── Step Tile ────────────────────────────────────────────────────────────────
 class _StepTile extends StatelessWidget {
   final PathStep step;
-  final bool isDone;
-  final bool isLocked;
-  final bool isActive;
+  final bool isDone, isLocked, isActive;
   final VoidCallback? onTap;
 
   const _StepTile({
@@ -220,23 +210,17 @@ class _StepTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Step ${step.order}',
-                    style: TextStyle(
-                        color: isLocked ? c.textMuted : NexColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3),
-                  ),
+                  Text('Step ${step.order}',
+                      style: TextStyle(
+                          color: isLocked ? c.textMuted : NexColors.primary,
+                          fontSize: 11, fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3)),
                   const SizedBox(height: 3),
-                  Text(
-                    step.title,
-                    style: TextStyle(
-                        color: isLocked ? c.textMuted : c.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3),
-                  ),
+                  Text(step.title,
+                      style: TextStyle(
+                          color: isLocked ? c.textMuted : c.textPrimary,
+                          fontSize: 15, fontWeight: FontWeight.w600,
+                          height: 1.3)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -244,25 +228,18 @@ class _StepTile extends StatelessWidget {
                           style: const TextStyle(fontSize: 12)),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(
-                          '${step.sourceName} · ${step.duration}',
-                          style: TextStyle(
-                              color: c.textMuted, fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        child: Text('${step.sourceName} · ${step.duration}',
+                            style: TextStyle(color: c.textMuted, fontSize: 12),
+                            overflow: TextOverflow.ellipsis),
                       ),
                     ],
                   ),
                   if (step.note.isNotEmpty && isActive) ...[
                     const SizedBox(height: 8),
-                    Text(
-                      '💡 ${step.note}',
-                      style: TextStyle(
-                          color: c.textSecondary,
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                          height: 1.4),
-                    ),
+                    Text('💡 ${step.note}',
+                        style: TextStyle(
+                            color: c.textSecondary, fontSize: 12,
+                            fontStyle: FontStyle.italic, height: 1.4)),
                   ],
                 ],
               ),
@@ -271,8 +248,7 @@ class _StepTile extends StatelessWidget {
             if (isLocked)
               Icon(Icons.lock_outline, color: c.textMuted, size: 18)
             else if (isDone)
-              const Icon(Icons.check_circle,
-                  color: NexColors.success, size: 24)
+              const Icon(Icons.check_circle, color: NexColors.success, size: 24)
             else
               const Icon(Icons.play_circle_outline,
                   color: NexColors.primary, size: 24),
@@ -284,8 +260,7 @@ class _StepTile extends StatelessWidget {
 
   Widget _buildStepIcon(NexColors c) {
     return Container(
-      width: 42,
-      height: 42,
+      width: 42, height: 42,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: isDone
@@ -303,8 +278,7 @@ class _StepTile extends StatelessWidget {
                 : isLocked
                     ? c.textMuted
                     : NexColors.primary,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
+            fontSize: 14, fontWeight: FontWeight.w800,
           ),
         ),
       ),

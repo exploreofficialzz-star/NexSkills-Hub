@@ -37,11 +37,11 @@
         },
         {
           "order": 4,
-          "title": "ChatGPT Beginner's Guide",
+          "title": "ChatGPT & Prompt Engineering Guide",
           "type": "article",
-          "url": "https://towardsdatascience.com/the-complete-guide-to-chatgpt-a-beginners-handbook",
+          "url": "https://www.promptingguide.ai/introduction/basics",
           "duration": "10 min read",
-          "source": "Towards Data Science",
+          "source": "Prompting Guide",
           "note": "Read this after the videos — practical walkthrough."
         },
         {
@@ -55,11 +55,11 @@
         },
         {
           "order": 6,
-          "title": "Top 10 Prompt Engineering Techniques",
+          "title": "Top Prompt Engineering Techniques",
           "type": "article",
-          "url": "https://towardsdatascience.com/prompt-engineering-techniques",
+          "url": "https://www.promptingguide.ai/techniques",
           "duration": "8 min read",
-          "source": "Towards Data Science",
+          "source": "Prompting Guide",
           "note": "Bookmark this. You'll come back to it often."
         },
         {
@@ -128,11 +128,11 @@
         },
         {
           "order": 5,
-          "title": "Fine-tuning vs Prompt Engineering: When to Use Which",
+          "title": "Fine-tuning vs Prompt Engineering",
           "type": "article",
-          "url": "https://towardsdatascience.com/fine-tuning-vs-prompt-engineering",
+          "url": "https://platform.openai.com/docs/guides/fine-tuning",
           "duration": "12 min read",
-          "source": "Towards Data Science",
+          "source": "OpenAI Docs",
           "note": "Critical decision framework every AI builder needs."
         },
         {
@@ -157,9 +157,9 @@
           "order": 8,
           "title": "Deploying AI Apps to Production",
           "type": "article",
-          "url": "https://towardsdatascience.com/deploying-llm-apps",
+          "url": "https://huggingface.co/blog/deploy-llms",
           "duration": "15 min read",
-          "source": "Towards Data Science",
+          "source": "HuggingFace Blog",
           "note": "Take your AI project from laptop to live."
         }
       ]
@@ -194,9 +194,9 @@
           "order": 3,
           "title": "Evaluating LLMs: Benchmarks and Metrics",
           "type": "article",
-          "url": "https://towardsdatascience.com/llm-evaluation-guide",
+          "url": "https://huggingface.co/blog/open-llm-leaderboard-v2",
           "duration": "18 min read",
-          "source": "Towards Data Science",
+          "source": "HuggingFace Blog",
           "note": "How to measure if your AI is actually good."
         }
       ]
@@ -248,7 +248,7 @@
         },
         {
           "order": 5,
-          "title": "Password Security: How Attacks Actually Work",
+          "title": "Password Security: How Attacks Work",
           "type": "article",
           "url": "https://krebsonsecurity.com/tag/passwords/",
           "duration": "8 min read",
@@ -342,29 +342,29 @@
       "steps": [
         {
           "order": 1,
-          "title": "What is No-Code?",
+          "title": "What is No-Code? The Full Breakdown",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=MiyuMvuvHcI",
-          "duration": "8 min",
-          "source": "Webflow",
+          "url": "https://www.youtube.com/watch?v=9_E3RKPKQJQ",
+          "duration": "10 min",
+          "source": "Kevin Stratvert",
           "note": "The revolution that lets anyone build software."
         },
         {
           "order": 2,
-          "title": "Webflow in 45 Minutes",
+          "title": "Build a Website Without Code",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=mxO-8JpODeE",
-          "duration": "45 min",
-          "source": "Webflow",
-          "note": "Build a real website with no code."
+          "url": "https://www.youtube.com/watch?v=BdM7Nz8vHuk",
+          "duration": "22 min",
+          "source": "Kevin Stratvert",
+          "note": "Build a real website with no code using free tools."
         },
         {
           "order": 3,
-          "title": "Bubble.io Complete Beginners Guide",
+          "title": "Bubble.io Complete Guide",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=7cUATGqVxHU",
           "duration": "30 min",
-          "source": "Bubble Official",
+          "source": "Liam Ottley",
           "note": "Build a full web app without writing one line of code."
         },
         {
@@ -378,12 +378,12 @@
         },
         {
           "order": 5,
-          "title": "No-Code Business Ideas That Actually Work",
+          "title": "No-Code Tools Guide 2025",
           "type": "article",
-          "url": "https://www.nocode.mba/articles",
+          "url": "https://zapier.com/blog/no-code-tools/",
           "duration": "10 min read",
-          "source": "No Code MBA",
-          "note": "Real businesses built with no-code tools."
+          "source": "Zapier Blog",
+          "note": "Real tools used by no-code builders worldwide."
         }
       ]
     },
@@ -397,12 +397,12 @@
       "steps": [
         {
           "order": 1,
-          "title": "Build a SaaS with Bubble",
+          "title": "Build an AI-Powered App with No Code",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=C-lMbMjuAYs",
-          "duration": "1 hr",
-          "source": "Bubble Official",
-          "note": "Full SaaS build from scratch — payments included."
+          "url": "https://www.youtube.com/watch?v=5vMC0-OFmkY",
+          "duration": "35 min",
+          "source": "Liam Ottley",
+          "note": "Full product build from scratch — payments and AI included."
         }
       ]
     },
@@ -418,9 +418,9 @@
           "order": 1,
           "title": "Integrating AI into No-Code Apps",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=5vMC0-OFmkY",
+          "url": "https://www.youtube.com/watch?v=OasrncpKk5k",
           "duration": "30 min",
-          "source": "Kevin Stratvert",
+          "source": "Liam Ottley",
           "note": "Add GPT-4 to your Bubble or Webflow app."
         }
       ]
@@ -481,12 +481,12 @@
         },
         {
           "order": 6,
-          "title": "Your First Data Project",
+          "title": "Start Your First Data Project",
           "type": "article",
-          "url": "https://www.analyticsvidhya.com/blog/first-data-project",
+          "url": "https://www.kaggle.com/learn/intro-to-programming",
           "duration": "15 min read",
-          "source": "Analytics Vidhya",
-          "note": "Build something for your portfolio today."
+          "source": "Kaggle Learn",
+          "note": "Build something for your portfolio today. Free & interactive."
         }
       ]
     },
@@ -550,7 +550,7 @@
           "order": 2,
           "title": "AWS vs Azure vs GCP",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=M988_fsOSWo",
+          "url": "https://www.youtube.com/watch?v=1DfVmskwNM8",
           "duration": "12 min",
           "source": "TechWorld with Nana",
           "note": "Understand the three clouds before choosing one."
@@ -593,7 +593,7 @@
         },
         {
           "order": 7,
-          "title": "AWS Solutions Architect Path",
+          "title": "AWS Solutions Architect Roadmap",
           "type": "article",
           "url": "https://aws.amazon.com/blogs/aws/",
           "duration": "10 min read",
