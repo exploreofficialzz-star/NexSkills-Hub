@@ -5,30 +5,31 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../constants/app_constants.dart';
 import 'hive_service.dart';
 
-/// AdService — Aggressive but fully policy-compliant ad strategy
+/// AdService — Maximum revenue, fully Google-policy compliant.
 ///
-/// Interstitial policy (Google):
-///  • Min 60 seconds between shows → we use 90s (safety margin)
-///  • Never on back-press or back navigation
-///  • Never auto-triggered; always tied to a user navigation action
-///  • Not shown on app first launch / onboarding
+/// POLICY RULES (strictly observed):
+///   • Interstitials: min 60s between shows → we enforce 90s
+///   • Never on back-press / back navigation
+///   • Never on first app launch / onboarding
+///   • Never auto-triggered without a user action
+///   • Must be closeable per platform timer
 ///
-/// Session dedup rule (UX + policy best practice):
-///  • Each content item (by ID) shows an interstitial AT MOST ONCE per
-///    app session. Repeat opens of the same content skip the ad.
-///  • The 90s cooldown is ALSO enforced, so whichever gate fires first wins.
+/// AGGRESSIVE STRATEGY (within policy):
+///   • Interstitial on EVERY content open (90s cooldown, no session dedup)
+///   • Interstitial on tab switch when cooldown has elapsed
+///   • Adaptive banner on every screen (Today, Explore, Progress)
+///   • Rewarded ads for streak save, bonus XP, article-limit unlock
+///   • App-open on cold resume after 30+ min in background
 ///
-/// Ad placements:
-///  1. Adaptive banner — content viewer (below video info), Explore, Today
-///  2. Interstitial — before opening content (once/item/session + 90s cooldown)
-///  3. Rewarded — streak save, bonus lesson, article-limit unlock
-///  4. App-open — cold resume after 30+ min away
+/// WHY THIS IS MORE AGGRESSIVE THAN BEFORE:
+///   The previous version had session dedup (_shownThisSession) that blocked
+///   the interstitial from ever showing on the same content twice per session.
+///   Removed. Now the ONLY gate is the 90s cooldown — meaning if user opens
+///   content A, waits 90s, then opens content A again, they get the ad.
+///   Same for tab switches — every tab change checks the cooldown and fires
+///   if eligible.
 
 class AdService {
-  // ─── Session interstitial dedup ───────────────────────────────
-  // Cleared when app comes back from a long background (AdLifecycleObserver)
-  static final Set<String> _shownThisSession = {};
-
   static InterstitialAd?  _interstitialAd;
   static RewardedAd?      _rewardedAd;
   static AppOpenAd?       _appOpenAd;
@@ -65,7 +66,8 @@ class AdService {
   // ─── ADAPTIVE BANNER ──────────────────────────────────────────
   static Future<BannerAd> createAdaptiveBanner(BuildContext context) async {
     final width = MediaQuery.of(context).size.width.truncate();
-    final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+    final size =
+        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
     return BannerAd(
       adUnitId: _bannerId,
       size: size ?? AdSize.banner,
@@ -75,11 +77,12 @@ class AdService {
   }
 
   static BannerAd createBanner() => BannerAd(
-    adUnitId: _bannerId,
-    size: AdSize.banner,
-    request: _request,
-    listener: BannerAdListener(onAdFailedToLoad: (ad, _) => ad.dispose()),
-  );
+        adUnitId: _bannerId,
+        size: AdSize.banner,
+        request: _request,
+        listener:
+            BannerAdListener(onAdFailedToLoad: (ad, _) => ad.dispose()),
+      );
 
   // ─── INTERSTITIAL ─────────────────────────────────────────────
   static void _preloadInterstitial() {
@@ -99,56 +102,61 @@ class AdService {
     );
   }
 
-  /// Show interstitial before navigating to content.
+  /// Show interstitial. Fires on EVERY eligible call — no session dedup.
+  /// Only gate: 90s cooldown + premium check + ad loaded.
   ///
-  /// [contentId] — unique ID of the content item (resource.id / step.url).
-  ///   If provided, the interstitial only shows ONCE per session for that item.
-  ///   Pass null for non-content navigation (e.g. opening Premium screen).
-  ///
-  /// [onDismissed] — always called regardless of whether the ad showed,
-  ///   so navigation is NEVER blocked.
+  /// [onDismissed] always called whether or not ad showed —
+  /// navigation is NEVER blocked.
   static Future<bool> showInterstitial({
-    String? contentId,
     VoidCallback? onDismissed,
+    // contentId kept for API compatibility but no longer used for dedup
+    String? contentId,
   }) async {
     final progress = HiveService.getProgress();
 
     // Gate 1: premium users never see ads
-    if (progress.isPremium) { onDismissed?.call(); return false; }
-
-    // Gate 2: session dedup — same content item only gets one interstitial
-    if (contentId != null && _shownThisSession.contains(contentId)) {
+    if (progress.isPremium) {
       onDismissed?.call();
       return false;
     }
 
-    // Gate 3: 90s cooldown between any interstitials
-    if (!progress.canShowInterstitial) { onDismissed?.call(); return false; }
+    // Gate 2: 90s cooldown (Google policy minimum is 60s)
+    if (!progress.canShowInterstitial) {
+      onDismissed?.call();
+      return false;
+    }
 
-    // Gate 4: ad not loaded yet
+    // Gate 3: ad not loaded yet — preload for next time
     if (_interstitialAd == null) {
       _preloadInterstitial();
       onDismissed?.call();
       return false;
     }
 
-    // All gates passed — mark this item as shown for the session
-    if (contentId != null) _shownThisSession.add(contentId);
-
     _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _interstitialAd = null; _preloadInterstitial();
+        ad.dispose();
+        _interstitialAd = null;
+        _preloadInterstitial();
         HiveService.recordInterstitialShown();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _interstitialAd = null; _preloadInterstitial();
+        ad.dispose();
+        _interstitialAd = null;
+        _preloadInterstitial();
         onDismissed?.call();
       },
     );
 
     await _interstitialAd!.show();
     return true;
+  }
+
+  /// Show interstitial on tab switch — no callback needed, just fire and forget.
+  /// Called from HomeScreen when user taps a tab and cooldown has elapsed.
+  static void showInterstitialForTabSwitch() {
+    showInterstitial(); // onDismissed = null, navigation already happened
   }
 
   // ─── REWARDED ─────────────────────────────────────────────────
@@ -159,29 +167,42 @@ class AdService {
       adUnitId: _rewardedId,
       request: _request,
       rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) { _rewardedAd = ad; _rewardedLoading = false; },
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          _rewardedLoading = false;
+        },
         onAdFailedToLoad: (_) => _rewardedLoading = false,
       ),
     );
   }
 
-  /// Policy: reward only granted inside [onRewarded], never automatically.
+  /// Policy: reward only granted inside [onRewarded]. Never automatic.
   /// Always user-initiated — never required for core features.
   static Future<bool> showRewarded({
     required void Function(RewardItem reward) onRewarded,
     VoidCallback? onDismissed,
   }) async {
     if (HiveService.getProgress().isPremium) return false;
-    if (_rewardedAd == null) { _preloadRewarded(); return false; }
+    if (_rewardedAd == null) {
+      _preloadRewarded();
+      return false;
+    }
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _rewardedAd = null; _preloadRewarded(); onDismissed?.call();
+        ad.dispose();
+        _rewardedAd = null;
+        _preloadRewarded();
+        onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _rewardedAd = null; _preloadRewarded(); onDismissed?.call();
+        ad.dispose();
+        _rewardedAd = null;
+        _preloadRewarded();
+        onDismissed?.call();
       },
     );
-    await _rewardedAd!.show(onUserEarnedReward: (_, reward) => onRewarded(reward));
+    await _rewardedAd!.show(
+        onUserEarnedReward: (_, reward) => onRewarded(reward));
     return true;
   }
 
@@ -194,7 +215,8 @@ class AdService {
       request: _request,
       adLoadCallback: AppOpenAdLoadCallback(
         onAdLoaded: (ad) {
-          _appOpenAd = ad; _appOpenLoading = false;
+          _appOpenAd = ad;
+          _appOpenLoading = false;
           _appOpenLoadedAt = DateTime.now();
         },
         onAdFailedToLoad: (_) => _appOpenLoading = false,
@@ -209,13 +231,20 @@ class AdService {
 
   static Future<void> showAppOpenIfReady() async {
     if (HiveService.getProgress().isPremium) return;
-    if (!_appOpenIsValid) { _preloadAppOpen(); return; }
+    if (!_appOpenIsValid) {
+      _preloadAppOpen();
+      return;
+    }
     _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _appOpenAd = null; _preloadAppOpen();
+        ad.dispose();
+        _appOpenAd = null;
+        _preloadAppOpen();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _appOpenAd = null; _preloadAppOpen();
+        ad.dispose();
+        _appOpenAd = null;
+        _preloadAppOpen();
       },
     );
     await _appOpenAd!.show();
@@ -236,10 +265,10 @@ class AdLifecycleObserver {
 
   static Future<void> onResume() async {
     if (_backgroundedAt == null) return;
-    final awaySeconds = DateTime.now().difference(_backgroundedAt!).inSeconds;
+    final awaySeconds =
+        DateTime.now().difference(_backgroundedAt!).inSeconds;
+    // Show app-open after 30 min away (aggressive but not annoying)
     if (awaySeconds > 1800) {
-      // Clear session dedup after 30 min away — fresh session
-      AdService._shownThisSession.clear();
       await AdService.showAppOpenIfReady();
     }
     _backgroundedAt = null;
