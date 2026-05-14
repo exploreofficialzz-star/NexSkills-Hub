@@ -13,7 +13,6 @@ class NexColors extends ThemeExtension<NexColors> {
   final Color navBorder;
   final Color progressTrack;
 
-  // Brand — identical in both themes
   static const primary       = Color(0xFF6C63FF);
   static const primaryLight  = Color(0xFF9D97FF);
   static const accent        = Color(0xFF00D4AA);
@@ -30,21 +29,14 @@ class NexColors extends ThemeExtension<NexColors> {
   static const categoryCloud = Color(0xFFAB47BC);
 
   const NexColors({
-    required this.background,
-    required this.surface,
-    required this.card,
-    required this.border,
-    required this.textPrimary,
-    required this.textSecondary,
-    required this.textMuted,
-    required this.navBackground,
-    required this.navBorder,
+    required this.background, required this.surface, required this.card,
+    required this.border, required this.textPrimary, required this.textSecondary,
+    required this.textMuted, required this.navBackground, required this.navBorder,
     required this.progressTrack,
   });
 
-  // ── Pure dark — true near-black, no blue tint ─────────────────
   static const dark = NexColors(
-    background:    Color(0xFF080808),   // ← pure dark
+    background:    Color(0xFF080808),
     surface:       Color(0xFF121212),
     card:          Color(0xFF1C1C1C),
     border:        Color(0xFF2A2A2A),
@@ -56,7 +48,6 @@ class NexColors extends ThemeExtension<NexColors> {
     progressTrack: Color(0xFF2A2A2A),
   );
 
-  // ── Clean light ───────────────────────────────────────────────
   static const light = NexColors(
     background:    Color(0xFFF5F5F5),
     surface:       Color(0xFFFFFFFF),
@@ -112,12 +103,11 @@ extension NexColorsX on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 }
 
-// ─── Legacy static shim — keeps unmigrated files compiling ───────────────────
+// ─── Legacy shim ─────────────────────────────────────────────────────────────
 class AppColors {
   static const background    = Color(0xFF080808);
   static const surface       = Color(0xFF121212);
   static const card          = Color(0xFF1C1C1C);
-  static const border        = Color(0xFF2A2A2A);
   static const primary       = NexColors.primary;
   static const primaryLight  = NexColors.primaryLight;
   static const accent        = NexColors.accent;
@@ -141,23 +131,34 @@ class AppColors {
 class AppStrings {
   static const appName          = 'NexSkills Hub';
   static const companyName      = 'chAs Tech Group';
-  static const tagline          = 'Your daily tech career journey';
   static const premiumMonthlyId = 'nexskills_premium_monthly';
   static const premiumYearlyId  = 'nexskills_premium_yearly';
 }
 
-// ─── Ad constants ─────────────────────────────────────────────────────────────
+// ─── Ad constants — PRODUCTION IDs ───────────────────────────────────────────
+// Android IDs from AdMob dashboard (ca-app-pub-2492078126313994~7689058997)
+// iOS IDs: replace with your iOS AdMob unit IDs when you create them
 class AdConstants {
-  static const androidBannerId       = 'ca-app-pub-3940256099942544/6300978111';
-  static const androidInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
-  static const androidRewardedId     = 'ca-app-pub-3940256099942544/5224354917';
-  static const androidNativeId       = 'ca-app-pub-3940256099942544/2247696110';
-  static const iosBannerId           = 'ca-app-pub-3940256099942544/2934735716';
-  static const iosInterstitialId     = 'ca-app-pub-3940256099942544/4411468910';
-  static const iosRewardedId         = 'ca-app-pub-3940256099942544/1712485313';
-  static const iosNativeId           = 'ca-app-pub-3940256099942544/3986624511';
+  // Android — PRODUCTION (your real IDs)
+  static const androidAppId              = 'ca-app-pub-2492078126313994~7689058997';
+  static const androidBannerId           = 'ca-app-pub-2492078126313994/2501069669';
+  static const androidInterstitialId     = 'ca-app-pub-2492078126313994/6735828149';
+  static const androidRewardedId         = 'ca-app-pub-2492078126313994/5558477847';
+  static const androidRewardedInterstitialId = 'ca-app-pub-2492078126313994/3430402711';
+  static const androidNativeId           = 'ca-app-pub-2492078126313994/9800975184';
+  // App-open: create this in AdMob → Ad units → App open. Paste ID here.
+  static const androidAppOpenId          = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
+
+  // iOS — replace with your real iOS AdMob unit IDs
+  static const iosBannerId               = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
+  static const iosInterstitialId         = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
+  static const iosRewardedId             = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
+  static const iosRewardedInterstitialId = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
+  static const iosNativeId               = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
+  static const iosAppOpenId              = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
+
+  // Policy: min 60s between interstitials. We use 90s for safety margin.
   static const interstitialCooldownSeconds = 90;
-  static const maxLiveBanners = 2;
 }
 
 // ─── Categories ───────────────────────────────────────────────────────────────

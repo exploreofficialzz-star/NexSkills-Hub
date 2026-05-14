@@ -3,66 +3,96 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 
-/// Three states the app can be in:
-///   online       — has interface AND confirmed live data
-///   interfaceOnly— has WiFi/mobile interface but data isn't flowing
-///                  (captive portal, SIM with no balance, etc.)
-///   offline      — no network interface at all
 enum ConnectivityStatus { online, interfaceOnly, offline }
 
+/// Multi-probe connectivity service.
+/// Distinguishes: offline / interface-only (no data) / fully online.
+/// Separately tracks whether ad domains are reachable (ad block detection).
 class ConnectivityService {
   ConnectivityService._();
   static final ConnectivityService instance = ConnectivityService._();
 
-  final Connectivity _connectivity = Connectivity();
-  final _controller = StreamController<ConnectivityStatus>.broadcast();
+  final _connectivity = Connectivity();
+  final _statusCtrl   = StreamController<ConnectivityStatus>.broadcast();
+  final _adBlockCtrl  = StreamController<bool>.broadcast();
 
-  ConnectivityStatus _current = ConnectivityStatus.online;
-  ConnectivityStatus get current => _current;
+  ConnectivityStatus _status  = ConnectivityStatus.online;
+  bool               _adBlocked = false;
+  DateTime?          _lastAdBlockCheck;
 
-  Stream<ConnectivityStatus> get stream => _controller.stream;
+  ConnectivityStatus get current   => _status;
+  bool               get adBlocked => _adBlocked;
 
-  // Lightweight endpoints used to confirm real data flow.
-  // We try each in order and succeed on first 204/200 response.
-  static const _probeUrls = [
-    'https://clients3.google.com/generate_204', // returns HTTP 204, zero body
+  Stream<ConnectivityStatus> get stream        => _statusCtrl.stream;
+  Stream<bool>               get adBlockStream => _adBlockCtrl.stream;
+
+  // ── Neutral probes — confirm general internet ──────────────────
+  static const _neutralProbes = [
+    'https://clients3.google.com/generate_204',  // returns 204, zero body
     'https://connectivitycheck.gstatic.com/generate_204',
-    'https://www.apple.com/library/test/success.html', // iOS captive portal check
+    'https://www.apple.com/library/test/success.html',
+  ];
+
+  // ── Ad-serving probes — blocked by ad blockers ─────────────────
+  static const _adProbes = [
+    'https://googleads.g.doubleclick.net/pagead/id',
+    'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js',
+    'https://adservice.google.com/adsid/integrator.js',
+    'https://securepubads.g.doubleclick.net/gampad/ads',
+    'https://www.googletagservices.com/tag/js/gpt.js',
   ];
 
   Future<void> init() async {
-    // Check once at startup
-    _current = await _checkStatus();
-    _controller.add(_current);
+    _status = await _checkConnectivity();
+    _statusCtrl.add(_status);
 
-    // Re-check whenever the interface changes
+    _adBlocked = await _checkAdBlock();
+    _adBlockCtrl.add(_adBlocked);
+
+    // React to interface changes
     _connectivity.onConnectivityChanged.listen((_) async {
-      final next = await _checkStatus();
-      if (next != _current) {
-        _current = next;
-        _controller.add(_current);
-      }
+      await _runFullCheck();
     });
 
-    // Periodic heartbeat every 30s — catches captive portals that don't
-    // trigger an interface change event
+    // 30s heartbeat — catches captive portals & SIM data exhaustion
     Timer.periodic(const Duration(seconds: 30), (_) async {
-      final next = await _checkStatus();
-      if (next != _current) {
-        _current = next;
-        _controller.add(_current);
+      await _runFullCheck();
+    });
+
+    // Ad-block check every 5 minutes (less frequent, more expensive)
+    Timer.periodic(const Duration(minutes: 5), (_) async {
+      final blocked = await _checkAdBlock();
+      if (blocked != _adBlocked) {
+        _adBlocked = blocked;
+        _adBlockCtrl.add(_adBlocked);
       }
     });
   }
 
-  /// Returns the current status without waiting for a stream event.
-  Future<ConnectivityStatus> check() async {
-    _current = await _checkStatus();
-    return _current;
+  Future<void> _runFullCheck() async {
+    final next = await _checkConnectivity();
+    if (next != _status) {
+      _status = next;
+      _statusCtrl.add(_status);
+    }
   }
 
-  Future<ConnectivityStatus> _checkStatus() async {
-    // Step 1: check interface (fast, local)
+  /// Force an immediate check — call after user toggles airplane mode etc.
+  Future<ConnectivityStatus> check() async {
+    _status = await _checkConnectivity();
+    _statusCtrl.add(_status);
+    return _status;
+  }
+
+  /// Force an immediate ad-block check.
+  Future<bool> checkAdBlock() async {
+    _adBlocked = await _checkAdBlock();
+    _adBlockCtrl.add(_adBlocked);
+    return _adBlocked;
+  }
+
+  // ── Private ───────────────────────────────────────────────────
+  Future<ConnectivityStatus> _checkConnectivity() async {
     final results = await _connectivity.checkConnectivity();
     final hasInterface = results.any((r) =>
         r == ConnectivityResult.wifi ||
@@ -71,28 +101,57 @@ class ConnectivityService {
 
     if (!hasInterface) return ConnectivityStatus.offline;
 
-    // Step 2: confirm actual data flows by probing a known endpoint
-    final hasData = await _probeInternet();
-    return hasData ? ConnectivityStatus.online : ConnectivityStatus.interfaceOnly;
-  }
-
-  Future<bool> _probeInternet() async {
-    for (final url in _probeUrls) {
-      try {
-        final response = await http
-            .head(Uri.parse(url))
-            .timeout(const Duration(seconds: 5));
-        if (response.statusCode < 400) return true;
-      } on SocketException {
-        // No route to host
-      } on TimeoutException {
-        // Probe timed out (captive portal / no data)
-      } catch (_) {
-        // Any other failure — try next probe
+    // Probe at least 2 neutral endpoints for reliability
+    int reached = 0;
+    for (final url in _neutralProbes) {
+      if (await _probe(url, timeoutSeconds: 5)) {
+        reached++;
+        if (reached >= 2) break;
       }
     }
-    return false;
+    return reached >= 1
+        ? ConnectivityStatus.online
+        : ConnectivityStatus.interfaceOnly;
   }
 
-  void dispose() => _controller.close();
+  Future<bool> _checkAdBlock() async {
+    // Skip if we checked recently (< 5 min)
+    if (_lastAdBlockCheck != null &&
+        DateTime.now().difference(_lastAdBlockCheck!).inMinutes < 5) {
+      return _adBlocked;
+    }
+
+    // Only check when we have real internet
+    if (_status != ConnectivityStatus.online) return false;
+
+    _lastAdBlockCheck = DateTime.now();
+
+    int blocked = 0;
+    for (final url in _adProbes) {
+      final reachable = await _probe(url, timeoutSeconds: 4);
+      if (!reachable) blocked++;
+    }
+    // Majority blocked → ad blocker active
+    return blocked >= 3;
+  }
+
+  Future<bool> _probe(String url, {int timeoutSeconds = 5}) async {
+    try {
+      final response = await http
+          .head(Uri.parse(url))
+          .timeout(Duration(seconds: timeoutSeconds));
+      return response.statusCode < 500;
+    } on SocketException {
+      return false;
+    } on TimeoutException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void dispose() {
+    _statusCtrl.close();
+    _adBlockCtrl.close();
+  }
 }

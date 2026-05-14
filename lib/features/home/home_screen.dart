@@ -20,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen>
   int _currentIndex = 0;
   late AnimationController _navController;
 
-  final _items = const [
+  static const _items = [
     _NavItem(icon: Icons.today_outlined,     activeIcon: Icons.today,     label: 'Today'),
     _NavItem(icon: Icons.route_outlined,     activeIcon: Icons.route,     label: 'My Path'),
     _NavItem(icon: Icons.explore_outlined,   activeIcon: Icons.explore,   label: 'Explore'),
@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen>
     super.initState();
     _navController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 300),
     );
   }
 
@@ -45,10 +45,7 @@ class _HomeScreenState extends State<HomeScreen>
   void _onTap(int i) {
     if (i == _currentIndex) return;
 
-    // ── Aggressive interstitial on tab switch ──────────────────
-    // Policy compliant: user action (tap) triggered, 90s cooldown enforced
-    // inside showInterstitialForTabSwitch(). Fires and forgets — tab switch
-    // happens immediately regardless of whether ad shows.
+    // Aggressive: interstitial on every tab switch if cooldown elapsed
     final progress = HiveService.getProgress();
     if (!progress.isPremium && progress.canShowInterstitial) {
       AdService.showInterstitialForTabSwitch();
@@ -69,8 +66,10 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+
     return Scaffold(
       backgroundColor: c.background,
+      // extendBody = content scrolls under the floating nav naturally
       extendBody: true,
       body: IndexedStack(
         index: _currentIndex,
@@ -86,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// ─── Floating pill nav ────────────────────────────────────────────────────────
+// ─── Floating nav — larger, pill shaped ──────────────────────────────────────
 class _FloatingNav extends StatelessWidget {
   final int currentIndex;
   final List<_NavItem> items;
@@ -106,31 +105,33 @@ class _FloatingNav extends StatelessWidget {
     final isDark = context.isDark;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      // 28px gap from bottom edge → larger, more spacious feel
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       child: Container(
-        height: 64,
+        // Taller nav bar = more thumb-friendly
+        height: 72,
         decoration: BoxDecoration(
           color: c.navBackground,
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: c.navBorder, width: 1),
+          borderRadius: BorderRadius.circular(36), // fully rounded pill
+          border: Border.all(color: c.navBorder, width: 0.8),
           boxShadow: [
             BoxShadow(
               color: isDark
-                  ? Colors.black.withOpacity(0.5)
-                  : Colors.black.withOpacity(0.10),
-              blurRadius: 24,
+                  ? Colors.black.withOpacity(0.55)
+                  : Colors.black.withOpacity(0.12),
+              blurRadius: 28,
               spreadRadius: 0,
-              offset: const Offset(0, 8),
+              offset: const Offset(0, 10),
             ),
             BoxShadow(
-              color: NexColors.primary.withOpacity(0.08),
-              blurRadius: 16,
+              color: NexColors.primary.withOpacity(isDark ? 0.12 : 0.06),
+              blurRadius: 20,
               offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(36),
           child: Row(
             children: List.generate(items.length, (i) {
               final selected = i == currentIndex;
@@ -138,44 +139,61 @@ class _FloatingNav extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => onTap(i),
                   behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 1, end: selected ? 1.18 : 1),
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.elasticOut,
-                        builder: (_, scale, child) =>
-                            Transform.scale(scale: scale, child: child),
-                        child: Icon(
-                          selected ? items[i].activeIcon : items[i].icon,
-                          color: selected ? NexColors.primary : c.textMuted,
-                          size: 22,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? NexColors.primary.withOpacity(0.12)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Bouncy icon
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 1, end: selected ? 1.2 : 1),
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.elasticOut,
+                          builder: (_, scale, child) =>
+                              Transform.scale(scale: scale, child: child),
+                          child: Icon(
+                            selected ? items[i].activeIcon : items[i].icon,
+                            color: selected
+                                ? NexColors.primary
+                                : c.textMuted,
+                            size: 24,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 180),
-                        style: TextStyle(
-                          color: selected ? NexColors.primary : c.textMuted,
-                          fontSize: 10,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
+                        const SizedBox(height: 4),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 180),
+                          style: TextStyle(
+                            color: selected
+                                ? NexColors.primary
+                                : c.textMuted,
+                            fontSize: 11,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                          child: Text(items[i].label),
                         ),
-                        child: Text(items[i].label),
-                      ),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        margin: const EdgeInsets.only(top: 3),
-                        width: selected ? 4 : 0,
-                        height: selected ? 4 : 0,
-                        decoration: const BoxDecoration(
-                          color: NexColors.primary,
-                          shape: BoxShape.circle,
+                        // Active dot indicator
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          margin: const EdgeInsets.only(top: 3),
+                          width: selected ? 5 : 0,
+                          height: selected ? 5 : 0,
+                          decoration: const BoxDecoration(
+                            color: NexColors.primary,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );

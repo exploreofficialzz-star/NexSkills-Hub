@@ -6,7 +6,9 @@ import '../../core/services/hive_service.dart';
 import '../../core/services/rss_service.dart';
 import '../../core/services/ad_service.dart';
 import '../../core/services/notification_service.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../../shared/ad_block_gate.dart';
 import 'resource_viewer_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -16,7 +18,8 @@ class ExploreScreen extends StatefulWidget {
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
 
-class _ExploreScreenState extends State<ExploreScreen> {
+class _ExploreScreenState extends State<ExploreScreen>
+    with AutomaticKeepAliveClientMixin {
   String _selectedCategory = 'all';
   String _selectedType     = 'all';
   List<ResourceModel> _items = [];
@@ -24,7 +27,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _refreshing = false;
   String? _error;
 
-  final _categories = const [
+  static const _categories = [
     ('all',          '🌐', 'All'),
     ('ai',           '🤖', 'AI'),
     ('cybersecurity','🔐', 'Cyber'),
@@ -33,11 +36,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
     ('cloud',        '☁️', 'Cloud'),
   ];
 
-  final _types = const [
+  static const _types = [
     ('all',     'All'),
     ('video',   'Videos'),
     ('article', 'Articles'),
   ];
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -67,10 +73,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
       final before = _items.length;
       await RssService.fetchAll();
       _loadFromCache();
-      final after = _items.length;
-      if (after - before > 0 && mounted) {
-        try { await NotificationService.showNewContentNotification('tech', after - before); }
-        catch (_) {}
+      final added = _items.length - before;
+      if (added > 0 && mounted) {
+        // Group by category and send batch notification
+        final newByCategory = <String, int>{};
+        for (final cat in ['ai', 'cybersecurity', 'nocode', 'data', 'cloud']) {
+          final fresh = HiveService.getResourcesByCategory(cat).length;
+          if (fresh > 0) newByCategory[cat] = fresh;
+        }
+        try {
+          await NotificationService.showBatchContentNotification(newByCategory);
+        } catch (_) {}
       }
     } catch (e) {
       if (mounted) setState(() => _error = 'Could not fetch content. Check your connection.');
@@ -90,21 +103,33 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return list;
   }
 
-  void _openResource(ResourceModel resource) {
-    // Pass contentId for session dedup — same article won't trigger
-    // interstitial again within the same app session
+  void _openResource(ResourceModel resource) async {
+    // Check ad block before showing interstitial
+    final adBlocked = ConnectivityService.instance.adBlocked;
+    if (adBlocked && mounted) {
+      final progress = HiveService.getProgress();
+      if (!progress.isPremium) {
+        AdBlockGate.show(context,
+            onAllowed: () => _navigateToResource(resource),
+            onSubscribed: () => _navigateToResource(resource));
+        return;
+      }
+    }
+
+    // Aggressive: interstitial on EVERY resource tap
     AdService.showInterstitial(
-      contentId: resource.id,
-      onDismissed: () {
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => ResourceViewerScreen(resource: resource)),
-          );
-        }
-      },
+      onDismissed: () => _navigateToResource(resource),
     );
+  }
+
+  void _navigateToResource(ResourceModel resource) {
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => ResourceViewerScreen(resource: resource)),
+    // Interstitial again on return — aggressive but policy compliant
+    ).then((_) => AdService.showInterstitial());
   }
 
   Future<void> _toggleBookmark(ResourceModel r) async {
@@ -114,6 +139,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final c = context.colors;
     return Scaffold(
       backgroundColor: c.background,
@@ -178,13 +204,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
         children: [
           const Icon(Icons.wifi_off, color: NexColors.error, size: 14),
           const SizedBox(width: 8),
-          Expanded(child: Text(_error!,
-              style: const TextStyle(color: NexColors.error, fontSize: 12))),
+          Expanded(
+            child: Text(_error!,
+                style: const TextStyle(color: NexColors.error, fontSize: 12)),
+          ),
           GestureDetector(
             onTap: _fetchFresh,
             child: const Text('Retry',
-                style: TextStyle(color: NexColors.primary, fontSize: 12,
-                    fontWeight: FontWeight.w700)),
+                style: TextStyle(color: NexColors.primary,
+                    fontSize: 12, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -236,12 +264,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
               onTap: () => setState(() => _selectedType = t.$1),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: selected ? NexColors.accent.withOpacity(0.12) : Colors.transparent,
+                  color: selected
+                      ? NexColors.accent.withOpacity(0.12)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: selected ? NexColors.accent : c.textMuted.withOpacity(0.3)),
+                    color: selected
+                        ? NexColors.accent
+                        : c.textMuted.withOpacity(0.3)),
                 ),
                 child: Text(t.$2,
                     style: TextStyle(
@@ -257,7 +290,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   Widget _buildList(NexColors c) {
     final items = _filtered;
-
     if (items.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -269,8 +301,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 const Text('📡', style: TextStyle(fontSize: 52)),
                 const SizedBox(height: 16),
                 Text('No content yet',
-                    style: TextStyle(color: c.textPrimary, fontSize: 18,
-                        fontWeight: FontWeight.w700)),
+                    style: TextStyle(color: c.textPrimary,
+                        fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
                 Text('Pull down to fetch latest content',
                     style: TextStyle(color: c.textMuted, fontSize: 13)),
@@ -283,14 +315,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     final progress = HiveService.getProgress();
 
-    // ── Build list with ads every 4 content items ─────────────
-    // Policy: ads clearly separated from content, no fake UI elements
+    // Build list with: ad every 4 items + ad-block gate awareness
     final withAds = <dynamic>[];
     int contentCount = 0;
     for (final item in items) {
       withAds.add(item);
       contentCount++;
-      // Insert ad slot after every 4th content item (not every 3)
       if (!progress.isPremium && contentCount % 4 == 0) {
         withAds.add('ad');
       }
@@ -298,6 +328,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
+      // Extra bottom padding so last item clears floating nav
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       itemCount: withAds.length,
       itemBuilder: (_, i) {
@@ -314,8 +345,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 }
 
-// ─── In-list ad slot (every 4 items) ─────────────────────────────────────────
-// Uses AdaptiveBannerWidget. Clearly labelled "Advertisement" — policy compliant.
+// ─── In-list real banner ad ───────────────────────────────────────────────────
 class _InListAdSlot extends StatefulWidget {
   final NexColors c;
   const _InListAdSlot({required this.c});
@@ -326,7 +356,7 @@ class _InListAdSlot extends StatefulWidget {
 
 class _InListAdSlotState extends State<_InListAdSlot> {
   BannerAd? _ad;
-  bool _loaded = false;
+  bool      _loaded = false;
 
   @override
   void didChangeDependencies() {
@@ -349,7 +379,7 @@ class _InListAdSlotState extends State<_InListAdSlot> {
     if (!_loaded || _ad == null) {
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
-        height: 60,
+        height: 56,
         decoration: BoxDecoration(
           color: c.card,
           borderRadius: BorderRadius.circular(12),
@@ -357,11 +387,11 @@ class _InListAdSlotState extends State<_InListAdSlot> {
         ),
         child: Center(
           child: Text('Advertisement',
-              style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5)),
+              style: TextStyle(color: c.textMuted,
+                  fontSize: 10, letterSpacing: 0.5)),
         ),
       );
     }
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -372,9 +402,10 @@ class _InListAdSlotState extends State<_InListAdSlot> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.only(top: 6, bottom: 4),
             child: Text('Advertisement',
-                style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5)),
+                style: TextStyle(color: c.textMuted,
+                    fontSize: 9, letterSpacing: 0.5)),
           ),
           SizedBox(
             width: _ad!.size.width.toDouble(),
