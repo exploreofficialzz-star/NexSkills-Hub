@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/ad_block_service.dart';
-import '../premium/premium_screen.dart';
+import '../features/premium/premium_screen.dart';
 
 /// Shows a bottom-sheet gate when ad blocking is detected.
 ///
@@ -306,4 +306,3 @@ class _AdBlockSheetState extends State<_AdBlockSheet> {
     );
   }
 }
-
