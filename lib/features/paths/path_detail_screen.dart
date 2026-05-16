@@ -4,6 +4,7 @@ import '../../core/models/learning_path.dart';
 import '../../core/models/user_progress.dart';
 import '../../core/services/hive_service.dart';
 import '../../core/services/ad_service.dart';
+import '../../core/services/ad_click_counter.dart';
 import 'content_viewer_screen.dart';
 
 class PathDetailScreen extends StatefulWidget {

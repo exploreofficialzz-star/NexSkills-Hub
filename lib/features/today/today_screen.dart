@@ -6,6 +6,7 @@ import '../../core/models/user_progress.dart';
 import '../../core/services/hive_service.dart';
 import '../../core/services/path_service.dart';
 import '../../core/services/ad_service.dart';
+import '../../core/services/ad_click_counter.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../paths/content_viewer_screen.dart';
@@ -79,24 +80,30 @@ class _TodayScreenState extends State<TodayScreen>
 
   void _startLesson() {
     if (_todayStep == null || _path == null) return;
-    // Aggressive: interstitial BEFORE every lesson open
-    AdService.showInterstitial(
-      onDismissed: () {
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ContentViewerScreen(
-                step: _todayStep!,
-                pathId: _path!.id,
-                pathCategory: _path!.category,
-                onComplete: _load,
-              ),
-            ),
-          // Interstitial again after returning from lesson
-          ).then((_) => AdService.showInterstitial());
-        }
-      },
+
+    void navigate() {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ContentViewerScreen(
+            step: _todayStep!,
+            pathId: _path!.id,
+            pathCategory: _path!.category,
+            onComplete: _load,
+          ),
+        ),
+      ).then((_) {
+        AdClickCounter.instance.onContentClick(
+          onAdReady: () {},
+          onSkip:    () {},
+        );
+      });
+    }
+
+    AdClickCounter.instance.onContentClick(
+      onAdReady: navigate,
+      onSkip:    navigate,
     );
   }
 

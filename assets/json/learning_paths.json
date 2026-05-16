@@ -19,24 +19,15 @@
         },
         {
           "order": 2,
-          "title": "Machine Learning for Everybody",
+          "title": "How Large Language Models Work",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=i_LwzRVP7bg",
-          "duration": "3 hr",
-          "source": "freeCodeCamp",
-          "note": "Full beginner ML course — go at your own pace."
+          "url": "https://www.youtube.com/watch?v=zjkBMFhNj_g",
+          "duration": "14 min",
+          "source": "Andrej Karpathy",
+          "note": "Karpathy explains LLMs in a way anyone can understand."
         },
         {
           "order": 3,
-          "title": "Neural Networks Explained Visually",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=aircAruvnKk",
-          "duration": "20 min",
-          "source": "3Blue1Brown",
-          "note": "The best visual explanation of neural networks ever made."
-        },
-        {
-          "order": 4,
           "title": "Intro to Prompt Engineering",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=_ZvnD73m40o",
@@ -45,40 +36,49 @@
           "note": "Learn the basics of talking to AI effectively."
         },
         {
-          "order": 5,
-          "title": "ChatGPT & Prompt Engineering Basics",
+          "order": 4,
+          "title": "ChatGPT & Prompt Engineering Guide",
           "type": "article",
           "url": "https://www.promptingguide.ai/introduction/basics",
           "duration": "10 min read",
           "source": "Prompting Guide",
-          "note": "Read this after the videos — practical walkthrough."
+          "note": "Read this after the videos \u2014 practical walkthrough."
+        },
+        {
+          "order": 5,
+          "title": "Neural Networks Explained Visually",
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=aircAruvnKk",
+          "duration": "20 min",
+          "source": "3Blue1Brown",
+          "note": "The best visual explanation of neural networks ever made."
         },
         {
           "order": 6,
-          "title": "Large Language Models Explained",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=zjkBMFhNj_g",
-          "duration": "59 min",
-          "source": "3Blue1Brown",
-          "note": "How transformers actually work — visualised beautifully."
-        },
-        {
-          "order": 7,
-          "title": "AI For Everyone — Full Course",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=T0qxjMGHnMY",
-          "duration": "1 hr",
-          "source": "freeCodeCamp",
-          "note": "Andrew Ng's AI for Everyone condensed. Perfect wrap-up."
-        },
-        {
-          "order": 8,
           "title": "Top Prompt Engineering Techniques",
           "type": "article",
           "url": "https://www.promptingguide.ai/techniques",
           "duration": "8 min read",
           "source": "Prompting Guide",
           "note": "Bookmark this. You'll come back to it often."
+        },
+        {
+          "order": 7,
+          "title": "AI Tools Every Beginner Should Know",
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=sTeoEFzVNSc",
+          "duration": "15 min",
+          "source": "Fireship",
+          "note": "Quick overview of the most useful AI tools in 2025."
+        },
+        {
+          "order": 8,
+          "title": "Your First AI Project Walkthrough",
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
+          "duration": "25 min",
+          "source": "Andrej Karpathy",
+          "note": "Build something real. This completes your beginner journey."
         }
       ]
     },
@@ -92,12 +92,12 @@
       "steps": [
         {
           "order": 1,
-          "title": "Python for Machine Learning & Data Science",
+          "title": "Understanding the OpenAI API",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=7eh4d6sabA0",
-          "duration": "6 hr",
-          "source": "freeCodeCamp",
-          "note": "The complete hands-on ML course with Python."
+          "url": "https://www.youtube.com/watch?v=uRQH2CFvedY",
+          "duration": "18 min",
+          "source": "Fireship",
+          "note": "How to make your first API call to an LLM."
         },
         {
           "order": 2,
@@ -110,12 +110,12 @@
         },
         {
           "order": 3,
-          "title": "Vector Databases Explained",
+          "title": "LangChain for Beginners",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=klTvEwg3oJ4",
-          "duration": "14 min",
-          "source": "IBM Technology",
-          "note": "The storage layer behind every RAG system."
+          "url": "https://www.youtube.com/watch?v=nAmC7SoVLd8",
+          "duration": "30 min",
+          "source": "Fireship",
+          "note": "Build AI pipelines with LangChain step by step."
         },
         {
           "order": 4,
@@ -128,24 +128,33 @@
         },
         {
           "order": 5,
-          "title": "Fine-tuning vs Prompt Engineering",
-          "type": "article",
-          "url": "https://platform.openai.com/docs/guides/fine-tuning",
-          "duration": "12 min read",
-          "source": "OpenAI Docs",
+          "title": "Fine-tuning Large Language Models Explained",
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=eC6Hd1hFvos",
+          "duration": "15 min",
+          "source": "IBM Technology",
           "note": "Critical decision framework every AI builder needs."
         },
         {
           "order": 6,
-          "title": "Hugging Face Full Course",
+          "title": "Build a Chatbot with Memory",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=00GKzGyWFEs",
-          "duration": "4 hr",
-          "source": "freeCodeCamp",
-          "note": "Use the world's largest open-source AI model hub."
+          "url": "https://www.youtube.com/watch?v=CyC1upQMXMw",
+          "duration": "25 min",
+          "source": "Fireship",
+          "note": "Add persistent memory to your AI apps."
         },
         {
           "order": 7,
+          "title": "Vector Databases Explained",
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=klTvEwg3oJ4",
+          "duration": "14 min",
+          "source": "IBM Technology",
+          "note": "The storage layer behind every RAG system."
+        },
+        {
+          "order": 8,
           "title": "Deploying AI Apps to Production",
           "type": "article",
           "url": "https://huggingface.co/blog/deploy-llms",
@@ -165,34 +174,33 @@
       "steps": [
         {
           "order": 1,
-          "title": "Deep Learning with PyTorch — Full Course",
+          "title": "Building GPT from Scratch",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=V_xro1bcAuA",
-          "duration": "26 hr",
-          "source": "freeCodeCamp",
-          "note": "Complete deep learning from scratch with PyTorch."
+          "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
+          "duration": "2 hr",
+          "source": "Andrej Karpathy",
+          "note": "The definitive deep dive. Build a GPT from nothing."
         },
         {
           "order": 2,
-          "title": "But what is a neural network?",
+          "title": "RLHF Explained: How ChatGPT is Trained",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=aircAruvnKk",
+          "url": "https://www.youtube.com/watch?v=hhiLw5Q_UFg",
           "duration": "20 min",
-          "source": "3Blue1Brown",
-          "note": "Go back to fundamentals before going advanced."
+          "source": "Andrej Karpathy",
+          "note": "Reinforcement Learning from Human Feedback demystified."
         },
         {
           "order": 3,
-          "title": "Evaluating LLMs: Benchmarks and Metrics",
+          "title": "Open LLM Leaderboard \u2014 Live Benchmarks",
           "type": "article",
-          "url": "https://huggingface.co/blog/open-llm-leaderboard-v2",
-          "duration": "18 min read",
-          "source": "HuggingFace Blog",
+          "url": "https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard",
+          "duration": "10 min read",
+          "source": "HuggingFace",
           "note": "How to measure if your AI is actually good."
         }
       ]
     },
-
     {
       "id": "cyber_beginner",
       "category": "cybersecurity",
@@ -212,42 +220,33 @@
         },
         {
           "order": 2,
-          "title": "Full Ethical Hacking Course",
+          "title": "How Hackers Break Into Systems",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=3Kq1MIfTWCE",
-          "duration": "15 hr",
-          "source": "freeCodeCamp",
-          "note": "The most complete free ethical hacking course on YouTube."
+          "url": "https://www.youtube.com/watch?v=9Thc6hRw2Gs",
+          "duration": "12 min",
+          "source": "NetworkChuck",
+          "note": "Eye-opening overview of the hacker mindset."
         },
         {
           "order": 3,
-          "title": "Networking for Hackers — Full Course",
+          "title": "Networking Basics Every Hacker Must Know",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=qiQR5rTSshw",
-          "duration": "1 hr",
-          "source": "freeCodeCamp",
-          "note": "TCP/IP, DNS, HTTP — the fundamentals every hacker needs."
+          "duration": "15 min",
+          "source": "NetworkChuck",
+          "note": "TCP/IP, DNS, HTTP \u2014 the fundamentals."
         },
         {
           "order": 4,
-          "title": "Linux for Beginners — Full Course",
+          "title": "Linux for Hackers (Beginner)",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=sWbUDq4S6Y8",
-          "duration": "3 hr",
-          "source": "freeCodeCamp",
+          "url": "https://www.youtube.com/watch?v=VbEx7B_PTOE",
+          "duration": "30 min",
+          "source": "NetworkChuck",
           "note": "Every security professional lives in the terminal."
         },
         {
           "order": 5,
-          "title": "How Firewalls Work",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=9GZlVOafYTg",
-          "duration": "8 min",
-          "source": "IBM Technology",
-          "note": "Understand the first line of defence in any network."
-        },
-        {
-          "order": 6,
           "title": "Password Security: How Attacks Work",
           "type": "article",
           "url": "https://krebsonsecurity.com/tag/passwords/",
@@ -256,22 +255,31 @@
           "note": "Real-world password attacks explained clearly."
         },
         {
+          "order": 6,
+          "title": "Setting Up Your First Hacking Lab",
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=mvsiuLzpx2E",
+          "duration": "20 min",
+          "source": "The Cyber Mentor",
+          "note": "Build a safe practice environment on your machine."
+        },
+        {
           "order": 7,
-          "title": "CompTIA Security+ Full Study Course",
+          "title": "CompTIA Security+ Overview",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=9NE33fpQuw8",
-          "duration": "13 hr",
-          "source": "freeCodeCamp",
-          "note": "The gold standard beginner certification — study guide."
+          "duration": "18 min",
+          "source": "NetworkChuck",
+          "note": "The gold standard beginner certification explained."
         },
         {
           "order": 8,
-          "title": "Penetration Testing 101",
+          "title": "Your First CTF Walkthrough",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=2_lswM1S264",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "Your first hands-on pentest walkthrough."
+          "url": "https://www.youtube.com/watch?v=Lqehvpe_djs",
+          "duration": "25 min",
+          "source": "John Hammond",
+          "note": "Solve your first Capture The Flag challenge."
         }
       ]
     },
@@ -285,30 +293,21 @@
       "steps": [
         {
           "order": 1,
-          "title": "Full Penetration Testing Bootcamp",
+          "title": "Penetration Testing Full Guide",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=3Kq1MIfTWCE",
-          "duration": "15 hr",
-          "source": "freeCodeCamp",
-          "note": "Hands-on pentest from recon to exploitation to report."
+          "url": "https://www.youtube.com/watch?v=3FNYvj2U0HM",
+          "duration": "45 min",
+          "source": "The Cyber Mentor",
+          "note": "The full pentest methodology from recon to report."
         },
         {
           "order": 2,
-          "title": "Web Application Security — OWASP Top 10",
+          "title": "Web Application Hacking Basics",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=F5KJVuii0Yw",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "SQL injection, XSS, CSRF — the 10 most critical vulnerabilities."
-        },
-        {
-          "order": 3,
-          "title": "Nmap Full Tutorial",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=4t4kBkMsDbQ",
-          "duration": "1 hr",
-          "source": "freeCodeCamp",
-          "note": "The network scanner every pentester relies on daily."
+          "url": "https://www.youtube.com/watch?v=jmgsgjPn1vs",
+          "duration": "20 min",
+          "source": "John Hammond",
+          "note": "SQL injection, XSS, and the OWASP Top 10."
         }
       ]
     },
@@ -322,25 +321,15 @@
       "steps": [
         {
           "order": 1,
-          "title": "Malware Analysis Full Course",
+          "title": "Malware Analysis for Beginners",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=qA0YcYMRWyI",
-          "duration": "3 hr",
-          "source": "freeCodeCamp",
-          "note": "Reverse engineer real malware safely in a lab environment."
-        },
-        {
-          "order": 2,
-          "title": "What is Zero Trust Security?",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=yn4wnr0l-as",
-          "duration": "10 min",
-          "source": "IBM Technology",
-          "note": "The architecture model all enterprises are moving to."
+          "url": "https://www.youtube.com/watch?v=rZKGMVaJRvY",
+          "duration": "35 min",
+          "source": "John Hammond",
+          "note": "Reverse engineer real malware safely."
         }
       ]
     },
-
     {
       "id": "nocode_beginner",
       "category": "nocode",
@@ -351,57 +340,48 @@
       "steps": [
         {
           "order": 1,
-          "title": "What is No-Code and Low-Code?",
+          "title": "No-Code and Low-Code Explained",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=9_E3RKPKQJQ",
+          "url": "https://www.youtube.com/watch?v=5tOeGj2tdN0",
           "duration": "10 min",
-          "source": "IBM Technology",
+          "source": "Traversy Media",
           "note": "The revolution that lets anyone build software."
         },
         {
           "order": 2,
-          "title": "FlutterFlow Full Course — Build Apps Visually",
+          "title": "Build a Website Without Code",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=gDoUQxrMc4M",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "Build real mobile apps without code using FlutterFlow."
+          "url": "https://www.youtube.com/watch?v=BdM7Nz8vHuk",
+          "duration": "22 min",
+          "source": "Kevin Stratvert",
+          "note": "Build a real website with no code using free tools."
         },
         {
           "order": 3,
-          "title": "Zapier Automation Full Tutorial",
+          "title": "Bubble.io Beginner Tutorial \u2014 Build a Real App",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=b7AvSqZoNwA",
-          "duration": "1 hr",
-          "source": "freeCodeCamp",
-          "note": "Automate your business workflows without code."
+          "url": "https://www.youtube.com/watch?v=7cUATGqVxHU",
+          "duration": "30 min",
+          "source": "Liam Ottley",
+          "note": "Build a full web app without writing one line of code."
         },
         {
           "order": 4,
-          "title": "Make.com (Integromat) Full Tutorial",
+          "title": "Make.com (Integromat) \u2014 Complete Beginner Tutorial",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=tOoSUhfAP0g",
-          "duration": "1 hr",
-          "source": "freeCodeCamp",
-          "note": "The most powerful no-code automation platform."
+          "url": "https://www.youtube.com/watch?v=IjPMfFQpqc0",
+          "duration": "20 min",
+          "source": "Kevin Stratvert",
+          "note": "Connect apps and automate repetitive tasks."
         },
         {
           "order": 5,
-          "title": "No-Code Tools Guide 2025",
+          "title": "What is No-Code? The Complete Guide",
           "type": "article",
-          "url": "https://zapier.com/blog/no-code-tools/",
+          "url": "https://zapier.com/blog/what-is-no-code/",
           "duration": "10 min read",
           "source": "Zapier Blog",
-          "note": "The definitive list of tools every no-code builder should know."
-        },
-        {
-          "order": 6,
-          "title": "Airtable Full Tutorial — No-Code Databases",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=FEoEvSmtmPQ",
-          "duration": "1 hr",
-          "source": "freeCodeCamp",
-          "note": "Build powerful databases and apps with Airtable."
+          "note": "Real tools used by no-code builders worldwide."
         }
       ]
     },
@@ -410,26 +390,17 @@
       "category": "nocode",
       "title": "Ship Your First Product",
       "level": "intermediate",
-      "description": "Take your no-code skills and build a real monetisable product.",
+      "description": "Take your no-code skills and build a real monetizable product.",
       "prerequisite": "nocode_beginner",
       "steps": [
         {
           "order": 1,
-          "title": "Bubble.io Full Course — Build Web Apps",
+          "title": "Build an AI-Powered App with No Code",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=MzSLJ_-wzWo",
-          "duration": "3 hr",
-          "source": "freeCodeCamp",
-          "note": "Build a full SaaS app with Bubble — payments included."
-        },
-        {
-          "order": 2,
-          "title": "Stripe Payments with No Code",
-          "type": "article",
-          "url": "https://stripe.com/docs/no-code",
-          "duration": "10 min read",
-          "source": "Stripe Docs",
-          "note": "Accept real payments in your no-code app today."
+          "url": "https://www.youtube.com/watch?v=5vMC0-OFmkY",
+          "duration": "35 min",
+          "source": "Liam Ottley",
+          "note": "Full product build from scratch \u2014 payments and AI included."
         }
       ]
     },
@@ -443,77 +414,67 @@
       "steps": [
         {
           "order": 1,
-          "title": "OpenAI API Full Course — AI-Power Your Apps",
+          "title": "Integrating AI into No-Code Apps",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=uRQH2CFvedY",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "Wire AI into any app — no-code or coded."
-        },
-        {
-          "order": 2,
-          "title": "What are AI Agents?",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=F8NKVhkZZWI",
-          "duration": "10 min",
-          "source": "IBM Technology",
-          "note": "Build agents that take actions on their own."
+          "url": "https://www.youtube.com/watch?v=OasrncpKk5k",
+          "duration": "30 min",
+          "source": "Liam Ottley",
+          "note": "Add GPT-4 to your Bubble or Webflow app."
         }
       ]
     },
-
     {
       "id": "data_beginner",
       "category": "data",
       "title": "Data Literacy Fundamentals",
       "level": "beginner",
-      "description": "Learn to think in data. Excel, SQL and your first visualisations.",
+      "description": "Learn to think in data. Excel, SQL and your first visualizations.",
       "prerequisite": null,
       "steps": [
         {
           "order": 1,
-          "title": "Statistics — Full University Course",
+          "title": "How to Become a Data Analyst in 2025",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=xxpc-HPKN28",
-          "duration": "8 hr",
-          "source": "freeCodeCamp",
-          "note": "Build the statistical foundation every data analyst needs."
+          "url": "https://www.youtube.com/watch?v=CC_MXWkEmtk",
+          "duration": "12 min",
+          "source": "Alex The Analyst",
+          "note": "The complete roadmap from zero to data analyst."
         },
         {
           "order": 2,
-          "title": "Excel for Data Analysis — Full Course",
+          "title": "Excel for Data Analysis",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=Vl0H-qTclOg",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "The tool you already have — master it first."
+          "url": "https://www.youtube.com/watch?v=k1VmrSW7myY",
+          "duration": "30 min",
+          "source": "Alex The Analyst",
+          "note": "The tool you already have \u2014 master it first."
         },
         {
           "order": 3,
-          "title": "SQL Full Course",
+          "title": "SQL in 1 Hour",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=HXV3zeQKqGY",
-          "duration": "4 hr",
-          "source": "freeCodeCamp",
+          "url": "https://www.youtube.com/watch?v=9Epjh-DVqoU",
+          "duration": "60 min",
+          "source": "Alex The Analyst",
           "note": "The single most valuable skill a data person can have."
         },
         {
           "order": 4,
-          "title": "Data Analysis with Python — Full Course",
+          "title": "Statistics Fundamentals",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=r-uOLxNrNk8",
-          "duration": "4 hr",
-          "source": "freeCodeCamp",
-          "note": "pandas, NumPy and real datasets — hands-on."
+          "url": "https://www.youtube.com/watch?v=qBigTkBLU6g",
+          "duration": "15 min",
+          "source": "StatQuest",
+          "note": "Mean, median, variance \u2014 explained the StatQuest way."
         },
         {
           "order": 5,
-          "title": "Data Visualisation with Python",
+          "title": "Python for Data Science in 10 Minutes",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=a9UrKTVEeZA",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "Turn raw data into compelling charts and dashboards."
+          "url": "https://www.youtube.com/watch?v=MXPiqCOsIoc",
+          "duration": "12 min",
+          "source": "Luke Barousse",
+          "note": "The fastest intro to Python for non-programmers."
         },
         {
           "order": 6,
@@ -522,7 +483,7 @@
           "url": "https://www.kaggle.com/learn/intro-to-programming",
           "duration": "15 min read",
           "source": "Kaggle Learn",
-          "note": "Build something for your portfolio today. Free and interactive."
+          "note": "Build something for your portfolio today. Free & interactive."
         }
       ]
     },
@@ -531,26 +492,17 @@
       "category": "data",
       "title": "Data Analysis in Practice",
       "level": "intermediate",
-      "description": "pandas, visualisation, dashboards and real datasets.",
+      "description": "pandas, visualization, dashboards and real datasets.",
       "prerequisite": "data_beginner",
       "steps": [
         {
           "order": 1,
-          "title": "Machine Learning with Python — Full Course",
+          "title": "Pandas Full Course",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=NWONeJKn6kc",
-          "duration": "3 hr",
-          "source": "freeCodeCamp",
-          "note": "scikit-learn, models, train/test — all hands on."
-        },
-        {
-          "order": 2,
-          "title": "Tableau Full Tutorial",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=TPMlZxRRaBQ",
-          "duration": "5 hr",
-          "source": "freeCodeCamp",
-          "note": "The BI tool most data jobs ask for by name."
+          "url": "https://www.youtube.com/watch?v=vmEHCJofslg",
+          "duration": "1 hr",
+          "source": "Luke Barousse",
+          "note": "The core Python data library \u2014 master this."
         }
       ]
     },
@@ -564,25 +516,15 @@
       "steps": [
         {
           "order": 1,
-          "title": "Deep Learning Full Course",
+          "title": "Machine Learning Explained Clearly",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=VyWAvY2CF9c",
-          "duration": "6 hr",
-          "source": "freeCodeCamp",
-          "note": "Neural networks and deep learning from scratch."
-        },
-        {
-          "order": 2,
-          "title": "Natural Language Processing with Python",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=X2vAabgKiuM",
-          "duration": "4 hr",
-          "source": "freeCodeCamp",
-          "note": "Text classification, sentiment analysis and more."
+          "url": "https://www.youtube.com/watch?v=Gv9_4yMHFhI",
+          "duration": "25 min",
+          "source": "StatQuest",
+          "note": "Scikit-learn, models, train/test splits \u2014 all clearly."
         }
       ]
     },
-
     {
       "id": "cloud_beginner",
       "category": "cloud",
@@ -602,48 +544,48 @@
         },
         {
           "order": 2,
-          "title": "AWS Full Course for Beginners",
+          "title": "AWS vs Azure vs GCP",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=ZB5ONbD_SMY",
-          "duration": "5 hr",
-          "source": "freeCodeCamp",
-          "note": "Complete AWS introduction covering all major services."
+          "url": "https://www.youtube.com/watch?v=1DfVmskwNM8",
+          "duration": "12 min",
+          "source": "TechWorld with Nana",
+          "note": "Understand the three clouds before choosing one."
         },
         {
           "order": 3,
-          "title": "Docker Full Course",
+          "title": "Automate Everything with Zapier",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=fqMOX6JJhGo",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "Containers from zero to production-ready."
+          "url": "https://www.youtube.com/watch?v=3hLmDS179YE",
+          "duration": "20 min",
+          "source": "NetworkChuck",
+          "note": "Deploy your first server in 20 minutes. Free."
         },
         {
           "order": 4,
-          "title": "Kubernetes Full Course",
+          "title": "Docker in 100 Seconds",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=d6WC5n9G_sM",
-          "duration": "4 hr",
-          "source": "freeCodeCamp",
-          "note": "Container orchestration — the #1 DevOps skill in demand."
+          "url": "https://www.youtube.com/watch?v=Gjnup-PuquQ",
+          "duration": "2 min",
+          "source": "Fireship",
+          "note": "The fastest Docker intro you'll ever watch."
         },
         {
           "order": 5,
-          "title": "Linux Full Course",
+          "title": "Kubernetes for Beginners",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=sWbUDq4S6Y8",
-          "duration": "3 hr",
-          "source": "freeCodeCamp",
-          "note": "Every cloud engineer lives in Linux. Master it first."
+          "url": "https://www.youtube.com/watch?v=s_o8dwzRlu4",
+          "duration": "40 min",
+          "source": "TechWorld with Nana",
+          "note": "Container orchestration from zero."
         },
         {
           "order": 6,
-          "title": "CI/CD with GitHub Actions",
+          "title": "CI/CD Pipeline Explained",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=R8_veQiYBjI",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "Automate your deployments like a professional team."
+          "url": "https://www.youtube.com/watch?v=42UP1fxi2SY",
+          "duration": "15 min",
+          "source": "TechWorld with Nana",
+          "note": "Automate your deployments like a pro."
         },
         {
           "order": 7,
@@ -652,7 +594,7 @@
           "url": "https://aws.amazon.com/blogs/aws/",
           "duration": "10 min read",
           "source": "AWS Blog",
-          "note": "The official path to the most valuable cloud certification."
+          "note": "The official roadmap to AWS certification."
         }
       ]
     },
@@ -669,18 +611,9 @@
           "title": "Terraform Full Course",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=SLB_c_ayRMo",
-          "duration": "3 hr",
-          "source": "freeCodeCamp",
-          "note": "Infrastructure as code — the most in-demand DevOps skill."
-        },
-        {
-          "order": 2,
-          "title": "Ansible Full Course",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=acHMFYOxRCQ",
-          "duration": "3 hr",
-          "source": "freeCodeCamp",
-          "note": "Automate server configuration and app deployments."
+          "duration": "1 hr",
+          "source": "TechWorld with Nana",
+          "note": "Infrastructure as code \u2014 the most in-demand DevOps skill."
         }
       ]
     },
@@ -694,21 +627,12 @@
       "steps": [
         {
           "order": 1,
-          "title": "Microservices Full Course",
+          "title": "Designing Microservices on AWS",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=lL_j7ilk7rc",
-          "duration": "4 hr",
-          "source": "freeCodeCamp",
-          "note": "Design distributed systems the right way."
-        },
-        {
-          "order": 2,
-          "title": "System Design Full Course",
-          "type": "video",
-          "url": "https://www.youtube.com/watch?v=MbjObHmDbZo",
-          "duration": "2 hr",
-          "source": "freeCodeCamp",
-          "note": "Design systems that scale to millions of users."
+          "url": "https://www.youtube.com/watch?v=RqCgL8B5zac",
+          "duration": "45 min",
+          "source": "AWS Events",
+          "note": "Real architecture decisions from AWS engineers."
         }
       ]
     }

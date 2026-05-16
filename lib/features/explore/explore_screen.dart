@@ -7,6 +7,7 @@ import '../../core/services/rss_service.dart';
 import '../../core/services/ad_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/connectivity_service.dart';
+import '../../core/services/ad_click_counter.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../../shared/ad_block_gate.dart';
 import 'resource_viewer_screen.dart';
@@ -104,7 +105,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   void _openResource(ResourceModel resource) async {
-    // Check ad block before showing interstitial
+    // Check ad block first
     final adBlocked = ConnectivityService.instance.adBlocked;
     if (adBlocked && mounted) {
       final progress = HiveService.getProgress();
@@ -116,9 +117,10 @@ class _ExploreScreenState extends State<ExploreScreen>
       }
     }
 
-    // Aggressive: interstitial on EVERY resource tap
-    AdService.showInterstitial(
-      onDismissed: () => _navigateToResource(resource),
+    // Click counter: interstitial fires every 2 content clicks
+    AdClickCounter.instance.onContentClick(
+      onAdReady: () => _navigateToResource(resource),
+      onSkip:    () => _navigateToResource(resource),
     );
   }
 
