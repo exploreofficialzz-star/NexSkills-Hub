@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:dart_rss/dart_rss.dart';
 import '../constants/sources.dart';
@@ -5,29 +6,43 @@ import '../models/resource_model.dart';
 import 'hive_service.dart';
 
 class RssService {
+  /// Fetch a single category's RSS feeds concurrently.
   static Future<List<ResourceModel>> fetchCategory(String category) async {
     final sources = AppSources.byCategory(category);
-    final List<ResourceModel> results = [];
 
-    await Future.wait(sources.map((source) async {
-      try {
-        final items = await _fetchSource(source);
-        results.addAll(items);
-      } catch (_) {}
-    }));
+    // All sources in a category fetched concurrently (Section 4.2a)
+    final results = await Future.wait(
+      sources.map((source) async {
+        try {
+          return await _fetchSource(source);
+        } catch (_) {
+          return <ResourceModel>[];
+        }
+      }),
+      eagerError: false,
+    );
 
-    results.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    await HiveService.saveResources(results);
-    return results;
+    final flat = results.expand((r) => r).toList()
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+
+    await HiveService.saveResources(flat);
+    return flat;
   }
 
+  /// Fetch ALL categories concurrently — videos and articles interleaved
+  /// in a single merged list, sorted by publication date (Section 4.2a/b).
   static Future<List<ResourceModel>> fetchAll() async {
-    final categories = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
-    final List<ResourceModel> all = [];
-    for (final cat in categories) {
-      final items = await fetchCategory(cat);
-      all.addAll(items);
-    }
+    const categories = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
+
+    // Use compute() to keep JSON parsing / RSS parsing off the UI thread
+    final results = await Future.wait(
+      categories.map(fetchCategory),
+      eagerError: false,
+    );
+
+    final all = results.expand((r) => r).toList()
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+
     return all;
   }
 
@@ -41,15 +56,20 @@ class RssService {
 
     if (response.statusCode != 200) return [];
 
-    final body = response.body;
-    final List<ResourceModel> items = [];
+    // Offload parsing to a background isolate via compute() (Section 1.1)
+    return compute(_parseSource, _ParseArgs(source: source, body: response.body));
+  }
 
-    // dart_rss 3.x: AtomItem.published and RssItem.pubDate are both String?,
-    // NOT DateTime. Parse them manually with _parseDate().
+  // ─── Isolate-safe parse function ─────────────────────────────
+  static List<ResourceModel> _parseSource(_ParseArgs args) {
+    final source = args.source;
+    final body   = args.body;
+    final items  = <ResourceModel>[];
+
     if (source.type == SourceType.youtube) {
       final feed = AtomFeed.parse(body);
       for (final entry in feed.items) {
-        final id = entry.id;
+        final id    = entry.id;
         final title = entry.title;
         if (id == null || title == null) continue;
 
@@ -58,17 +78,18 @@ class RssService {
             : '';
         if (url.isEmpty) continue;
 
-        final published = _parseDate(entry.published ?? entry.updated);
-        final thumbnail = _youtubeThumbnail(url);
+        final published   = _parseDate(entry.published ?? entry.updated);
+        final thumbnail   = _youtubeThumbnail(url);
+        final videoId     = _extractYouTubeId(url);
 
         items.add(ResourceModel(
-          id: id,
-          title: title,
-          url: url,
-          category: source.category,
-          type: 'video',
-          sourceName: source.name,
-          thumbnail: thumbnail.isNotEmpty ? thumbnail : null,
+          id:          id,
+          title:       title,
+          url:         url,
+          category:    source.category,
+          type:        'video', // ← explicit contentType field (Section 4.2c)
+          sourceName:  source.name,
+          thumbnail:   thumbnail.isNotEmpty ? thumbnail : null,
           publishedAt: published,
           description: entry.summary,
         ));
@@ -76,28 +97,26 @@ class RssService {
     } else {
       final feed = RssFeed.parse(body);
       for (final item in feed.items) {
-        final link = item.link;
+        final link  = item.link;
         final title = item.title;
         if (link == null || title == null) continue;
 
-        final id = item.guid ?? link;
+        final id        = item.guid ?? link;
         final published = _parseDate(item.pubDate);
 
         String? thumbnail;
-        if (item.enclosure?.url != null) {
-          thumbnail = item.enclosure!.url;
-        }
+        if (item.enclosure?.url != null) thumbnail = item.enclosure!.url;
         thumbnail ??= _extractImageFromHtml(item.content?.value ?? '');
         thumbnail ??= _extractImageFromHtml(item.description ?? '');
 
         items.add(ResourceModel(
-          id: id,
-          title: title,
-          url: link,
-          category: source.category,
-          type: source.type == SourceType.podcast ? 'podcast' : 'article',
-          sourceName: source.name,
-          thumbnail: thumbnail,
+          id:          id,
+          title:       title,
+          url:         link,
+          category:    source.category,
+          type:        source.type == SourceType.podcast ? 'podcast' : 'article',
+          sourceName:  source.name,
+          thumbnail:   thumbnail,
           publishedAt: published,
           description: item.description != null
               ? _stripHtml(item.description!)
@@ -110,18 +129,14 @@ class RssService {
   }
 
   // ─── Date parsing ─────────────────────────────────────────────
-  // dart_rss 3.x exposes raw strings; we handle both ISO 8601 (Atom)
-  // and RFC 822 (RSS) formats. Falls back to DateTime.now() so items
-  // always have a valid, sortable date.
   static DateTime _parseDate(String? raw) {
     if (raw == null || raw.trim().isEmpty) return DateTime.now();
-    // ISO 8601 (Atom): "2025-05-01T12:00:00Z"
     final iso = DateTime.tryParse(raw.trim());
     if (iso != null) return iso.toLocal();
-    // RFC 822 (RSS): "Mon, 05 May 2025 12:00:00 GMT"
     try {
-      final cleaned = raw.trim()
-          .replaceFirst(RegExp(r'^[A-Za-z]{3},\s*'), '') // strip weekday
+      final cleaned = raw
+          .trim()
+          .replaceFirst(RegExp(r'^[A-Za-z]{3},\s*'), '')
           .replaceAll(RegExp(r'\bGMT\b'), '+0000')
           .replaceAll(RegExp(r'\bUTC\b'), '+0000')
           .replaceAll(RegExp(r'\bEST\b'), '-0500')
@@ -135,35 +150,43 @@ class RssService {
   }
 
   // ─── Thumbnail helpers ────────────────────────────────────────
-  static String _youtubeThumbnail(String url) {
+  static String _extractYouTubeId(String url) {
     try {
       final uri = Uri.parse(url);
-      String id = '';
       if (uri.host.contains('youtu.be')) {
-        id = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
-      } else {
-        id = uri.queryParameters['v'] ?? '';
+        return uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
       }
-      if (id.isEmpty) return '';
-      return 'https://img.youtube.com/vi/$id/mqdefault.jpg';
+      return uri.queryParameters['v'] ?? '';
     } catch (_) {
       return '';
     }
   }
 
+  static String _youtubeThumbnail(String url) {
+    final id = _extractYouTubeId(url);
+    if (id.isEmpty) return '';
+    // hqdefault is 480×360 — good quality, always available (Section 4.2f)
+    return 'https://img.youtube.com/vi/$id/hqdefault.jpg';
+  }
+
   static String? _extractImageFromHtml(String html) {
     if (html.isEmpty) return null;
-    final regex =
-        RegExp(r'<img[^>]+src=["\x27]([^"\x27\s]+)["\x27]', caseSensitive: false);
+    final regex = RegExp(
+        r'<img[^>]+src=["\'](https?://[^"\'\\s]+)["\']',
+        caseSensitive: false);
     final match = regex.firstMatch(html);
-    final src = match?.group(1);
-    // Discard tiny tracking pixels and relative paths
-    if (src == null || src.startsWith('data:') || !src.startsWith('http')) {
-      return null;
-    }
+    final src   = match?.group(1);
+    if (src == null || src.startsWith('data:')) return null;
     return src;
   }
 
   static String _stripHtml(String html) =>
       html.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+}
+
+// ─── Isolate message ──────────────────────────────────────────────────────────
+class _ParseArgs {
+  final ContentSource source;
+  final String body;
+  const _ParseArgs({required this.source, required this.body});
 }

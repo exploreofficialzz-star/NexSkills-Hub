@@ -4,6 +4,7 @@ import 'core/services/hive_service.dart';
 import 'core/services/ad_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/connectivity_service.dart';
+import 'core/services/content_health_service.dart';
 import 'shared/theme.dart';
 import 'shared/network_aware_wrapper.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -18,24 +19,24 @@ void main() async {
   ]);
 
   await HiveService.init();
+
+  // Initialize AdMob SDK only — do NOT preload ads here (Section 5.1 / 1.6).
+  // Ads are preloaded after the first frame renders, inside HomeScreen.
   await Future.wait([
-    AdService.initialize(),
+    AdService.initializeSdkOnly(), // SDK init, no ad loading
     ConnectivityService.instance.init(),
   ]);
-  try { await NotificationService.init(); } catch (_) {}
+  try {
+    await NotificationService.init();
+  } catch (_) {}
 
   final progress = HiveService.getProgress();
 
-  // FIX: original had operator precedence bug — && binds tighter than ||
-  // so (A && B) || C || D was the actual expression.
-  // A fresh user completing onboarding has activeCategory set but
-  // lastActiveDate == null → first clause false → always fell through
-  // to onboarding even after completing it.
   final isOnboarded = progress.activeCategory.isNotEmpty &&
       (progress.lastActiveDate != null ||
           progress.totalXP > 0 ||
           progress.totalLessonsCompleted > 0 ||
-          progress.dailyGoalMinutes != 20); // non-default = user picked one
+          progress.dailyGoalMinutes != 20);
 
   runApp(NexSkillsApp(isOnboarded: isOnboarded));
 }
@@ -84,13 +85,13 @@ class _NexSkillsAppState extends State<NexSkillsApp>
 
   void _applyOverlay(ThemeMode mode) {
     final brightness = switch (mode) {
-      ThemeMode.dark   => Brightness.dark,
-      ThemeMode.light  => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.light => Brightness.light,
       ThemeMode.system =>
-          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+        WidgetsBinding.instance.platformDispatcher.platformBrightness,
     };
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor:           Colors.transparent,
+      statusBarColor: Colors.transparent,
       statusBarIconBrightness:
           brightness == Brightness.dark ? Brightness.light : Brightness.dark,
       systemNavigationBarColor: Colors.transparent,
@@ -100,20 +101,90 @@ class _NexSkillsAppState extends State<NexSkillsApp>
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title:                      'NexSkills Hub',
+      title: 'NexSkills Hub',
       debugShowCheckedModeBanner: false,
-      theme:     AppTheme.light,
+      theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _themeMode,
-      // NetworkAwareWrapper MUST be inside MaterialApp so it has
-      // access to Theme.of(context) for correct dark/light colours.
-      // It listens to ConnectivityService.instance.stream which fires
-      // whenever connectivity changes — works throughout the full app session.
+      // Global error boundary — catches Flutter rendering exceptions and
+      // shows a user-friendly fallback instead of the red error box.
+      builder: (context, child) {
+        return _GlobalErrorBoundary(child: child ?? const SizedBox.shrink());
+      },
       home: NetworkAwareWrapper(
         child: widget.isOnboarded
             ? HomeScreen(onThemeModeChanged: setThemeMode)
             : const OnboardingScreen(),
       ),
     );
+  }
+}
+
+// ─── Global error boundary ────────────────────────────────────────────────────
+class _GlobalErrorBoundary extends StatefulWidget {
+  final Widget child;
+  const _GlobalErrorBoundary({required this.child});
+
+  @override
+  State<_GlobalErrorBoundary> createState() => _GlobalErrorBoundaryState();
+}
+
+class _GlobalErrorBoundaryState extends State<_GlobalErrorBoundary> {
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Catch uncaught Flutter errors globally
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      if (mounted) setState(() => _error = details.exception);
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) {
+      return Material(
+        color: const Color(0xFF080808),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('😕', style: TextStyle(fontSize: 56)),
+                const SizedBox(height: 20),
+                const Text(
+                  'Something went wrong',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Please restart the app. If this keeps happening, '
+                  'contact support.',
+                  style: TextStyle(color: Color(0xFF888888), fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                TextButton(
+                  onPressed: () => setState(() => _error = null),
+                  child: const Text(
+                    'Try again',
+                    style: TextStyle(color: Color(0xFF6C63FF), fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return widget.child;
   }
 }

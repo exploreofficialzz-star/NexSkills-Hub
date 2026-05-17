@@ -19,24 +19,26 @@ import 'hive_service.dart';
 ///   • Never on back-press
 ///   • Always user-action triggered
 ///   • Premium users never see any ads
+///
+/// NOTE: Call [initializeSdkOnly] from main() — it does NOT preload ads.
+/// Ad preloading is handled by AdManager.init() from a postFrameCallback
+/// in HomeScreen, so ads are never loaded before the first frame renders.
 
 class AdService {
-  static InterstitialAd?         _interstitialAd;
-  static RewardedAd?             _rewardedAd;
+  static InterstitialAd? _interstitialAd;
+  static RewardedAd? _rewardedAd;
   static RewardedInterstitialAd? _rewardedInterstitialAd;
-  static AppOpenAd?              _appOpenAd;
+  static AppOpenAd? _appOpenAd;
 
-  static bool _interstitialLoading         = false;
-  static bool _rewardedLoading             = false;
+  static bool _interstitialLoading = false;
+  static bool _rewardedLoading = false;
   static bool _rewardedInterstitialLoading = false;
-  static bool _appOpenLoading              = false;
+  static bool _appOpenLoading = false;
   static DateTime? _appOpenLoadedAt;
 
   // ── IDs — production ──────────────────────────────────────────
   static String get _bannerId =>
-      Platform.isIOS
-          ? AdConstants.iosBannerId
-          : AdConstants.androidBannerId;
+      Platform.isIOS ? AdConstants.iosBannerId : AdConstants.androidBannerId;
 
   static String get _interstitialId =>
       Platform.isIOS
@@ -44,9 +46,7 @@ class AdService {
           : AdConstants.androidInterstitialId;
 
   static String get _rewardedId =>
-      Platform.isIOS
-          ? AdConstants.iosRewardedId
-          : AdConstants.androidRewardedId;
+      Platform.isIOS ? AdConstants.iosRewardedId : AdConstants.androidRewardedId;
 
   static String get _rewardedInterstitialId =>
       Platform.isIOS
@@ -54,21 +54,24 @@ class AdService {
           : AdConstants.androidRewardedInterstitialId;
 
   static String get _appOpenId =>
-      Platform.isIOS
-          ? AdConstants.iosAppOpenId
-          : AdConstants.androidAppOpenId;
+      Platform.isIOS ? AdConstants.iosAppOpenId : AdConstants.androidAppOpenId;
 
   static const AdRequest _request = AdRequest();
 
-  // ─── Init ─────────────────────────────────────────────────────
-  static Future<void> initialize() async {
+  // ─── SDK Init only (no ad loading) ────────────────────────────
+  /// Call this from main() — initializes the MobileAds SDK but does NOT
+  /// load any ads. Ad loading happens post-first-frame via AdManager.
+  static Future<void> initializeSdkOnly() async {
     await MobileAds.instance.initialize();
     MobileAds.instance.updateRequestConfiguration(RequestConfiguration(
       tagForChildDirectedTreatment: TagForChildDirectedTreatment.unspecified,
       tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.unspecified,
     ));
-    _preloadAll();
   }
+
+  /// Legacy entry point — kept for compatibility.
+  /// Now redirects to [initializeSdkOnly]; preloading is moved to AdManager.
+  static Future<void> initialize() async => initializeSdkOnly();
 
   static void _preloadAll() {
     _preloadInterstitial();
@@ -118,10 +121,17 @@ class AdService {
 
   /// Show interstitial. ONLY gate = 90s cooldown + premium check.
   /// [onDismissed] always called — navigation is NEVER blocked.
-  static Future<bool> showInterstitial({VoidCallback? onDismissed, String? contentId}) async {
+  static Future<bool> showInterstitial(
+      {VoidCallback? onDismissed, String? contentId}) async {
     final progress = HiveService.getProgress();
-    if (progress.isPremium) { onDismissed?.call(); return false; }
-    if (!progress.canShowInterstitial) { onDismissed?.call(); return false; }
+    if (progress.isPremium) {
+      onDismissed?.call();
+      return false;
+    }
+    if (!progress.canShowInterstitial) {
+      onDismissed?.call();
+      return false;
+    }
     if (_interstitialAd == null) {
       _preloadInterstitial();
       onDismissed?.call();
@@ -130,12 +140,16 @@ class AdService {
 
     _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _interstitialAd = null; _preloadInterstitial();
+        ad.dispose();
+        _interstitialAd = null;
+        _preloadInterstitial();
         HiveService.recordInterstitialShown();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _interstitialAd = null; _preloadInterstitial();
+        ad.dispose();
+        _interstitialAd = null;
+        _preloadInterstitial();
         onDismissed?.call();
       },
     );
@@ -154,7 +168,10 @@ class AdService {
       adUnitId: _rewardedId,
       request: _request,
       rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) { _rewardedAd = ad; _rewardedLoading = false; },
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          _rewardedLoading = false;
+        },
         onAdFailedToLoad: (_) => _rewardedLoading = false,
       ),
     );
@@ -165,14 +182,21 @@ class AdService {
     VoidCallback? onDismissed,
   }) async {
     if (HiveService.getProgress().isPremium) return false;
-    if (_rewardedAd == null) { _preloadRewarded(); return false; }
+    if (_rewardedAd == null) {
+      _preloadRewarded();
+      return false;
+    }
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _rewardedAd = null; _preloadRewarded();
+        ad.dispose();
+        _rewardedAd = null;
+        _preloadRewarded();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _rewardedAd = null; _preloadRewarded();
+        ad.dispose();
+        _rewardedAd = null;
+        _preloadRewarded();
         onDismissed?.call();
       },
     );
@@ -181,7 +205,6 @@ class AdService {
   }
 
   // ─── REWARDED INTERSTITIAL ────────────────────────────────────
-  // Shown after lesson complete — user-initiated via "Watch ad → +50 XP"
   static void _preloadRewardedInterstitial() {
     if (_rewardedInterstitialLoading || _rewardedInterstitialAd != null) return;
     _rewardedInterstitialLoading = true;
@@ -222,8 +245,8 @@ class AdService {
         onDismissed?.call();
       },
     );
-    await _rewardedInterstitialAd!.show(
-        onUserEarnedReward: (_, r) => onRewarded(r));
+    await _rewardedInterstitialAd!
+        .show(onUserEarnedReward: (_, r) => onRewarded(r));
     return true;
   }
 
@@ -252,17 +275,28 @@ class AdService {
 
   static Future<void> showAppOpenIfReady() async {
     if (HiveService.getProgress().isPremium) return;
-    if (!_appOpenIsValid) { _preloadAppOpen(); return; }
+    if (!_appOpenIsValid) {
+      _preloadAppOpen();
+      return;
+    }
     _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _appOpenAd = null; _preloadAppOpen();
+        ad.dispose();
+        _appOpenAd = null;
+        _preloadAppOpen();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _appOpenAd = null; _preloadAppOpen();
+        ad.dispose();
+        _appOpenAd = null;
+        _preloadAppOpen();
       },
     );
     await _appOpenAd!.show();
   }
+
+  /// Called from HomeScreen's postFrameCallback — safe point to start
+  /// loading all ad formats without blocking the first frame.
+  static void preloadAllPostFrame() => _preloadAll();
 
   static void dispose() {
     _interstitialAd?.dispose();

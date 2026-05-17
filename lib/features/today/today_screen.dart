@@ -5,8 +5,7 @@ import '../../core/models/learning_path.dart';
 import '../../core/models/user_progress.dart';
 import '../../core/services/hive_service.dart';
 import '../../core/services/path_service.dart';
-import '../../core/services/ad_service.dart';
-import '../../core/services/ad_click_counter.dart';
+import '../../core/services/ad_manager.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../paths/content_viewer_screen.dart';
@@ -23,12 +22,12 @@ class _TodayScreenState extends State<TodayScreen>
     with AutomaticKeepAliveClientMixin {
   UserProgress? _progress;
   LearningPath? _path;
-  PathStep?     _todayStep;
-  bool          _loading = true;
+  PathStep? _todayStep;
+  bool _loading = true;
 
-  // Inline banner ad between streak card and lesson
+  // Inline banner between streak card and lesson
   BannerAd? _bannerAd;
-  bool      _bannerLoaded = false;
+  bool _bannerLoaded = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -37,6 +36,8 @@ class _TodayScreenState extends State<TodayScreen>
   void initState() {
     super.initState();
     _load();
+    // Load banner AFTER first frame so it doesn't block the initial render
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBanner());
   }
 
   Future<void> _load() async {
@@ -61,13 +62,12 @@ class _TodayScreenState extends State<TodayScreen>
         _loading = false;
       });
     }
-    _loadBanner();
   }
 
   Future<void> _loadBanner() async {
     if (HiveService.getProgress().isPremium) return;
     if (ConnectivityService.instance.adBlocked) return;
-    final ad = AdService.createBanner();
+    final ad = AdManager.instance.createBannerAd();
     await ad.load();
     if (mounted) setState(() { _bannerAd = ad; _bannerLoaded = true; });
   }
@@ -78,6 +78,9 @@ class _TodayScreenState extends State<TodayScreen>
     super.dispose();
   }
 
+  /// Start Today's Lesson — shows interstitial BEFORE navigating.
+  /// Uses a 3-second timeout so navigation is never blocked if the ad
+  /// isn't ready (Section 2.1 / 5.1 graceful degradation).
   void _startLesson() {
     if (_todayStep == null || _path == null) return;
 
@@ -93,17 +96,13 @@ class _TodayScreenState extends State<TodayScreen>
             onComplete: _load,
           ),
         ),
-      ).then((_) {
-        AdClickCounter.instance.onContentClick(
-          onAdReady: () {},
-          onSkip:    () {},
-        );
-      });
+      );
     }
 
-    AdClickCounter.instance.onContentClick(
-      onAdReady: navigate,
-      onSkip:    navigate,
+    // Show interstitial with 3s timeout; navigate regardless of outcome
+    AdManager.instance.showInterstitialWithTimeout(
+      onDismissed: navigate,
+      timeout: const Duration(seconds: 3),
     );
   }
 
@@ -129,18 +128,23 @@ class _TodayScreenState extends State<TodayScreen>
           color: NexColors.primary,
           backgroundColor: c.card,
           child: CustomScrollView(
+            // BouncingScrollPhysics for smooth feel (Section 2.2c)
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             slivers: [
               SliverPadding(
-                // Extra bottom padding so content clears the floating nav
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     _buildHeader(progress, c),
                     const SizedBox(height: 24),
-                    _buildStreakCard(progress),
+
+                    // RepaintBoundary around streak card — animates independently
+                    RepaintBoundary(child: _buildStreakCard(progress)),
                     const SizedBox(height: 16),
 
-                    // ── Banner ad between streak and lesson ────────
+                    // Banner ad between streak and lesson
                     if (_bannerLoaded && _bannerAd != null) ...[
                       _InlineBanner(ad: _bannerAd!, c: c),
                       const SizedBox(height: 16),
@@ -148,7 +152,12 @@ class _TodayScreenState extends State<TodayScreen>
 
                     _buildTodayLesson(c),
                     const SizedBox(height: 20),
-                    _buildWeeklyGoal(progress, c),
+
+                    // Isolated WeeklyGoal widget — its animation never
+                    // rebuilds the rest of the Today tab (Section 2.2d)
+                    RepaintBoundary(
+                      child: _WeeklyGoalCard(progress: progress, c: c),
+                    ),
                     const SizedBox(height: 20),
                     _buildQuickStats(progress, c),
                     const SizedBox(height: 20),
@@ -293,8 +302,8 @@ class _TodayScreenState extends State<TodayScreen>
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: NexColors.primary.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
@@ -367,50 +376,6 @@ class _TodayScreenState extends State<TodayScreen>
     );
   }
 
-  Widget _buildWeeklyGoal(UserProgress p, NexColors c) {
-    final goal = (p.dailyGoalMinutes / 10).round() * 5;
-    final done = p.totalLessonsCompleted % 7;
-    final progress = goal > 0 ? (done / goal).clamp(0.0, 1.0) : 0.0;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: c.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: c.border, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text('🎯', style: TextStyle(fontSize: 20)),
-              const SizedBox(width: 8),
-              Text('Weekly Goal',
-                  style: TextStyle(
-                      color: c.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: c.progressTrack,
-              color: NexColors.accent,
-              minHeight: 10,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text('$done of $goal lessons this week',
-              style: TextStyle(color: c.textMuted, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildQuickStats(UserProgress p, NexColors c) {
     return Row(
       children: [
@@ -438,7 +403,7 @@ class _TodayScreenState extends State<TodayScreen>
   Widget _buildPremiumNudge(NexColors c) {
     return GestureDetector(
       onTap: () {
-        AdService.showInterstitial(onDismissed: () {
+        AdManager.instance.showInterstitial(onDismissed: () {
           if (mounted) {
             Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const PremiumScreen()));
@@ -485,6 +450,86 @@ class _TodayScreenState extends State<TodayScreen>
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WeeklyGoalCard — isolated StatefulWidget so its TweenAnimationBuilder
+// never triggers a rebuild of the rest of TodayScreen. (Section 2.2d)
+// ─────────────────────────────────────────────────────────────────────────────
+class _WeeklyGoalCard extends StatefulWidget {
+  final UserProgress progress;
+  final NexColors c;
+
+  const _WeeklyGoalCard({required this.progress, required this.c});
+
+  @override
+  State<_WeeklyGoalCard> createState() => _WeeklyGoalCardState();
+}
+
+class _WeeklyGoalCardState extends State<_WeeklyGoalCard> {
+  late double _targetProgress;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.progress;
+    final goal = (p.dailyGoalMinutes / 10).round() * 5;
+    final done = p.totalLessonsCompleted % 7;
+    _targetProgress = goal > 0 ? (done / goal).clamp(0.0, 1.0) : 0.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.progress;
+    final c = widget.c;
+    final goal = (p.dailyGoalMinutes / 10).round() * 5;
+    final done = p.totalLessonsCompleted % 7;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: c.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.border, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🎯', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Text('Weekly Goal',
+                  style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // TweenAnimationBuilder only rebuilds this widget, not TodayScreen
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: _targetProgress),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeOutCubic,
+            builder: (_, value, __) => ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: value,
+                backgroundColor: c.progressTrack,
+                color: NexColors.accent,
+                minHeight: 10,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text('$done of $goal lessons this week',
+              style: TextStyle(color: c.textMuted, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Inline banner widget ─────────────────────────────────────────────────────
 class _InlineBanner extends StatelessWidget {
   final BannerAd ad;
   final NexColors c;

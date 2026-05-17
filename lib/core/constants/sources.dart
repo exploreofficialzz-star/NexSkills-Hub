@@ -19,7 +19,7 @@ class ContentSource {
 class AppSources {
   static const List<ContentSource> all = [
 
-    // ─── AI — YouTube (embed-friendly channels only) ───────────
+    // ─── AI — YouTube ──────────────────────────────────────────
     ContentSource(
       name: 'IBM Technology',
       type: SourceType.youtube,
@@ -38,10 +38,18 @@ class AppSources {
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA',
       category: 'ai', icon: '🤖',
     ),
+    // ── Karpathy: corrected channel ID (Section 4.2f) ──────────
     ContentSource(
       name: 'Andrej Karpathy',
       type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCXUPKJO5MBESSY8m-A-2YOQA',
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCH-kyQ9Q-6yS1XcNj8nNPPA',
+      category: 'ai', icon: '🤖',
+    ),
+    // ── TechWorld with Nana (Section 4.2f) ─────────────────────
+    ContentSource(
+      name: 'TechWorld with Nana',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCdngmbVKX1Tgre699-XLlUA',
       category: 'ai', icon: '🤖',
     ),
 
@@ -184,6 +192,13 @@ class AppSources {
       name: 'NetworkChuck',
       type: SourceType.youtube,
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC9x0AN7BWHpCDHSm9NiJFJQ',
+      category: 'cloud', icon: '☁️',
+    ),
+    // ── TechWorld with Nana also excellent for cloud/DevOps ────
+    ContentSource(
+      name: 'TechWorld with Nana',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCdngmbVKX1Tgre699-XLlUA',
       category: 'cloud', icon: '☁️',
     ),
 

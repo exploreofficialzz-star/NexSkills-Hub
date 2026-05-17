@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/ad_service.dart';
+import '../../core/services/ad_manager.dart';
+import '../../core/services/content_health_service.dart';
 import '../../core/services/hive_service.dart';
 import '../today/today_screen.dart';
 import '../paths/paths_screen.dart';
@@ -21,10 +23,22 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _navController;
 
   static const _items = [
-    _NavItem(icon: Icons.today_outlined,     activeIcon: Icons.today,     label: 'Today'),
-    _NavItem(icon: Icons.route_outlined,     activeIcon: Icons.route,     label: 'My Path'),
-    _NavItem(icon: Icons.explore_outlined,   activeIcon: Icons.explore,   label: 'Explore'),
-    _NavItem(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart, label: 'Progress'),
+    _NavItem(
+        icon: Icons.today_outlined,
+        activeIcon: Icons.today,
+        label: 'Today'),
+    _NavItem(
+        icon: Icons.route_outlined,
+        activeIcon: Icons.route,
+        label: 'My Path'),
+    _NavItem(
+        icon: Icons.explore_outlined,
+        activeIcon: Icons.explore,
+        label: 'Explore'),
+    _NavItem(
+        icon: Icons.bar_chart_outlined,
+        activeIcon: Icons.bar_chart,
+        label: 'Progress'),
   ];
 
   @override
@@ -34,6 +48,17 @@ class _HomeScreenState extends State<HomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+
+    // ── Post-frame: safe to load ads and run background tasks ────
+    // Ads are NEVER loaded before the first frame (policy + Section 1.6).
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 1. Preload all ad formats via AdManager (60s cooldown guard)
+      await AdManager.instance.init();
+      // 2. Also preload AppOpen + legacy AdService ad slots
+      AdService.preloadAllPostFrame();
+      // 3. Run the daily content health check in the background
+      ContentHealthService.runDailyCheckInBackground();
+    });
   }
 
   @override
@@ -45,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen>
   void _onTap(int i) {
     if (i == _currentIndex) return;
 
-    // Aggressive: interstitial on every tab switch if cooldown elapsed
+    // Interstitial on tab switch (user-action triggered, 60s cooldown in AdManager)
     final progress = HiveService.getProgress();
     if (!progress.isPremium && progress.canShowInterstitial) {
       AdService.showInterstitialForTabSwitch();
@@ -69,11 +94,12 @@ class _HomeScreenState extends State<HomeScreen>
 
     return Scaffold(
       backgroundColor: c.background,
-      // extendBody = content scrolls under the floating nav naturally
       extendBody: true,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: List.generate(4, _buildScreen),
+      body: RepaintBoundary(
+        child: IndexedStack(
+          index: _currentIndex,
+          children: List.generate(4, _buildScreen),
+        ),
       ),
       bottomNavigationBar: _FloatingNav(
         currentIndex: _currentIndex,
@@ -85,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// ─── Floating nav — larger, pill shaped ──────────────────────────────────────
+// ─── Floating nav ─────────────────────────────────────────────────────────────
 class _FloatingNav extends StatelessWidget {
   final int currentIndex;
   final List<_NavItem> items;
@@ -105,14 +131,12 @@ class _FloatingNav extends StatelessWidget {
     final isDark = context.isDark;
 
     return Padding(
-      // 28px gap from bottom edge → larger, more spacious feel
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       child: Container(
-        // Taller nav bar = more thumb-friendly
         height: 72,
         decoration: BoxDecoration(
           color: c.navBackground,
-          borderRadius: BorderRadius.circular(36), // fully rounded pill
+          borderRadius: BorderRadius.circular(36),
           border: Border.all(color: c.navBorder, width: 0.8),
           boxShadow: [
             BoxShadow(
@@ -120,7 +144,6 @@ class _FloatingNav extends StatelessWidget {
                   ? Colors.black.withOpacity(0.55)
                   : Colors.black.withOpacity(0.12),
               blurRadius: 28,
-              spreadRadius: 0,
               offset: const Offset(0, 10),
             ),
             BoxShadow(
@@ -152,7 +175,6 @@ class _FloatingNav extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Bouncy icon
                         TweenAnimationBuilder<double>(
                           tween: Tween(begin: 1, end: selected ? 1.2 : 1),
                           duration: const Duration(milliseconds: 280),
@@ -161,9 +183,8 @@ class _FloatingNav extends StatelessWidget {
                               Transform.scale(scale: scale, child: child),
                           child: Icon(
                             selected ? items[i].activeIcon : items[i].icon,
-                            color: selected
-                                ? NexColors.primary
-                                : c.textMuted,
+                            color:
+                                selected ? NexColors.primary : c.textMuted,
                             size: 24,
                           ),
                         ),
@@ -171,9 +192,8 @@ class _FloatingNav extends StatelessWidget {
                         AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 180),
                           style: TextStyle(
-                            color: selected
-                                ? NexColors.primary
-                                : c.textMuted,
+                            color:
+                                selected ? NexColors.primary : c.textMuted,
                             fontSize: 11,
                             fontWeight: selected
                                 ? FontWeight.w700
@@ -181,7 +201,6 @@ class _FloatingNav extends StatelessWidget {
                           ),
                           child: Text(items[i].label),
                         ),
-                        // Active dot indicator
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
                           margin: const EdgeInsets.only(top: 3),

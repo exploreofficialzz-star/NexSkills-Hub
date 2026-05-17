@@ -4,9 +4,12 @@ import '../../core/models/learning_path.dart';
 import '../../core/models/user_progress.dart';
 import '../../core/services/hive_service.dart';
 import '../../core/services/path_service.dart';
-import '../../core/services/ad_service.dart';
+import '../../core/services/ad_manager.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import 'path_detail_screen.dart';
+
+/// Section key for path-card tap counter — persisted in Hive.
+const _kPathCardSection = 'path_cards';
 
 class PathsScreen extends StatefulWidget {
   const PathsScreen({super.key});
@@ -15,11 +18,15 @@ class PathsScreen extends StatefulWidget {
   State<PathsScreen> createState() => _PathsScreenState();
 }
 
-class _PathsScreenState extends State<PathsScreen> {
+class _PathsScreenState extends State<PathsScreen>
+    with AutomaticKeepAliveClientMixin {
   String _selectedCategory = 'ai';
   List<LearningPath> _paths = [];
   UserProgress? _progress;
   bool _loading = true;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -45,12 +52,33 @@ class _PathsScreenState extends State<PathsScreen> {
     _loadPaths();
   }
 
+  /// Tap a path card — every-other-tap interstitial rule (Section 3.1).
+  /// Tap 1 → ad; Tap 2 → skip; Tap 3 → ad; etc.
+  /// Counter is persisted in Hive across restarts via AdManager.
+  void _openPath(LearningPath path) {
+    AdManager.instance.showInterstitialForSection(
+      _kPathCardSection,
+      onDismissed: () {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PathDetailScreen(
+              path: path,
+              onStepComplete: () =>
+                  setState(() => _progress = HiveService.getProgress()),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final c = context.colors;
     return Scaffold(
-      // ← transparent lets IndexedStack background show through,
-      //   preventing the gray Material surface tint rectangle
       backgroundColor: c.background,
       body: SafeArea(
         child: Column(
@@ -154,7 +182,6 @@ class _PathsScreenState extends State<PathsScreen> {
 
   Widget _buildPathList(NexColors c) {
     return ListView.builder(
-      // ← crucial: transparent background prevents the gray tint rect
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       itemCount: _paths.length,
       itemBuilder: (_, i) {
@@ -164,22 +191,7 @@ class _PathsScreenState extends State<PathsScreen> {
           path: path,
           completedSteps: completed,
           isLocked: false,
-          onTap: () {
-            AdService.showInterstitial(onDismissed: () {
-              if (mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PathDetailScreen(
-                      path: path,
-                      onStepComplete: () =>
-                          setState(() => _progress = HiveService.getProgress()),
-                    ),
-                  ),
-                );
-              }
-            });
-          },
+          onTap: () => _openPath(path),
         );
       },
     );
@@ -201,15 +213,15 @@ class _PathCard extends StatelessWidget {
   });
 
   Color get _levelColor => switch (path.level) {
-        'beginner'     => NexColors.success,
+        'beginner' => NexColors.success,
         'intermediate' => NexColors.warning,
-        _              => NexColors.error,
+        _ => NexColors.error,
       };
 
   String get _levelEmoji => switch (path.level) {
-        'beginner'     => '🟢',
+        'beginner' => '🟢',
         'intermediate' => '🟡',
-        _              => '🔴',
+        _ => '🔴',
       };
 
   @override
@@ -217,7 +229,8 @@ class _PathCard extends StatelessWidget {
     final c = context.colors;
     final progressVal =
         path.totalSteps > 0 ? completedSteps / path.totalSteps : 0.0;
-    final isComplete = completedSteps >= path.totalSteps && path.totalSteps > 0;
+    final isComplete =
+        completedSteps >= path.totalSteps && path.totalSteps > 0;
 
     return GestureDetector(
       onTap: isLocked ? null : onTap,
@@ -228,23 +241,20 @@ class _PathCard extends StatelessWidget {
           color: isLocked ? c.surface : c.card,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isComplete
-                ? NexColors.accent
-                : c.border,
+            color: isComplete ? NexColors.accent : c.border,
             width: isComplete ? 1.5 : 0.5,
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Level badge row
             Row(
               children: [
                 Text(_levelEmoji, style: const TextStyle(fontSize: 20)),
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
                     color: _levelColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -267,8 +277,6 @@ class _PathCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-
-            // Title + desc
             Text(path.title,
                 style: TextStyle(
                     color: isLocked ? c.textMuted : c.textPrimary,
@@ -276,11 +284,9 @@ class _PathCard extends StatelessWidget {
                     fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             Text(path.description,
-                style: TextStyle(
-                    color: c.textMuted, fontSize: 13, height: 1.4)),
+                style:
+                    TextStyle(color: c.textMuted, fontSize: 13, height: 1.4)),
             const SizedBox(height: 16),
-
-            // Progress bar
             if (!isLocked) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
