@@ -321,11 +321,11 @@
       "steps": [
         {
           "order": 1,
-          "title": "Malware Analysis for Beginners",
+          "title": "Cybersecurity for Everyone \u2014 Full Intro",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=rZKGMVaJRvY",
-          "duration": "35 min",
-          "source": "John Hammond",
+          "url": "https://www.youtube.com/watch?v=9_E3RKPKQJQ",
+          "duration": "12 min",
+          "source": "IBM Technology",
           "note": "Reverse engineer real malware safely."
         }
       ]
@@ -340,38 +340,38 @@
       "steps": [
         {
           "order": 1,
-          "title": "No-Code and Low-Code Explained",
+          "title": "What is No-Code? Low-Code Explained",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=5tOeGj2tdN0",
+          "url": "https://www.youtube.com/watch?v=inWWhr5tnEA",
           "duration": "10 min",
-          "source": "Traversy Media",
+          "source": "IBM Technology",
           "note": "The revolution that lets anyone build software."
         },
         {
           "order": 2,
-          "title": "Build a Website Without Code",
+          "title": "Build a Website with No Code \u2014 Full Tutorial",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=BdM7Nz8vHuk",
+          "url": "https://www.youtube.com/watch?v=v7dD2G7V_yg",
           "duration": "22 min",
-          "source": "Kevin Stratvert",
+          "source": "Traversy Media",
           "note": "Build a real website with no code using free tools."
         },
         {
           "order": 3,
-          "title": "Bubble.io Beginner Tutorial \u2014 Build a Real App",
+          "title": "Bubble.io Full Tutorial \u2014 Build Real Apps",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=7cUATGqVxHU",
+          "url": "https://www.youtube.com/watch?v=MzSLJ_-wzWo",
           "duration": "30 min",
-          "source": "Liam Ottley",
+          "source": "Traversy Media",
           "note": "Build a full web app without writing one line of code."
         },
         {
           "order": 4,
-          "title": "Make.com (Integromat) \u2014 Complete Beginner Tutorial",
+          "title": "Automate with Make.com \u2014 Beginner Tutorial",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=IjPMfFQpqc0",
+          "url": "https://www.youtube.com/watch?v=b7AvSqZoNwA",
           "duration": "20 min",
-          "source": "Kevin Stratvert",
+          "source": "Traversy Media",
           "note": "Connect apps and automate repetitive tasks."
         },
         {
@@ -395,11 +395,11 @@
       "steps": [
         {
           "order": 1,
-          "title": "Build an AI-Powered App with No Code",
+          "title": "Build AI-Powered Apps Without Code",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=5vMC0-OFmkY",
-          "duration": "35 min",
-          "source": "Liam Ottley",
+          "url": "https://www.youtube.com/watch?v=F8NKVhkZZWI",
+          "duration": "10 min",
+          "source": "IBM Technology",
           "note": "Full product build from scratch \u2014 payments and AI included."
         }
       ]
@@ -414,11 +414,11 @@
       "steps": [
         {
           "order": 1,
-          "title": "Integrating AI into No-Code Apps",
+          "title": "AI Integration into No-Code Apps with RAG",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=OasrncpKk5k",
-          "duration": "30 min",
-          "source": "Liam Ottley",
+          "url": "https://www.youtube.com/watch?v=T-D1OfcDW1M",
+          "duration": "12 min",
+          "source": "IBM Technology",
           "note": "Add GPT-4 to your Bubble or Webflow app."
         }
       ]
@@ -433,29 +433,29 @@
       "steps": [
         {
           "order": 1,
-          "title": "How to Become a Data Analyst in 2025",
+          "title": "How to Become a Data Analyst \u2014 Roadmap",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=CC_MXWkEmtk",
-          "duration": "12 min",
-          "source": "Alex The Analyst",
+          "url": "https://www.youtube.com/watch?v=yZvFH7B6gKI",
+          "duration": "15 min",
+          "source": "Traversy Media",
           "note": "The complete roadmap from zero to data analyst."
         },
         {
           "order": 2,
-          "title": "Excel for Data Analysis",
+          "title": "Excel for Data Analysis \u2014 Full Tutorial",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=k1VmrSW7myY",
+          "url": "https://www.youtube.com/watch?v=Vl0H-qTclOg",
           "duration": "30 min",
-          "source": "Alex The Analyst",
+          "source": "Traversy Media",
           "note": "The tool you already have \u2014 master it first."
         },
         {
           "order": 3,
-          "title": "SQL in 1 Hour",
+          "title": "SQL Full Course for Beginners",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=9Epjh-DVqoU",
-          "duration": "60 min",
-          "source": "Alex The Analyst",
+          "url": "https://www.youtube.com/watch?v=HXV3zeQKqGY",
+          "duration": "1 hr",
+          "source": "Traversy Media",
           "note": "The single most valuable skill a data person can have."
         },
         {
@@ -469,11 +469,11 @@
         },
         {
           "order": 5,
-          "title": "Python for Data Science in 10 Minutes",
+          "title": "Python for Data Science \u2014 Crash Course",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=MXPiqCOsIoc",
+          "url": "https://www.youtube.com/watch?v=LHBE6Q9XlzI",
           "duration": "12 min",
-          "source": "Luke Barousse",
+          "source": "Traversy Media",
           "note": "The fastest intro to Python for non-programmers."
         },
         {
@@ -544,11 +544,11 @@
         },
         {
           "order": 2,
-          "title": "AWS vs Azure vs GCP",
+          "title": "AWS vs Azure vs GCP \u2014 Explained",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=1DfVmskwNM8",
-          "duration": "12 min",
-          "source": "TechWorld with Nana",
+          "url": "https://www.youtube.com/watch?v=M988_fsOSWo",
+          "duration": "10 min",
+          "source": "IBM Technology",
           "note": "Understand the three clouds before choosing one."
         },
         {
@@ -627,11 +627,11 @@
       "steps": [
         {
           "order": 1,
-          "title": "Designing Microservices on AWS",
+          "title": "Microservices Architecture \u2014 Full Course",
           "type": "video",
-          "url": "https://www.youtube.com/watch?v=RqCgL8B5zac",
+          "url": "https://www.youtube.com/watch?v=lL_j7ilk7rc",
           "duration": "45 min",
-          "source": "AWS Events",
+          "source": "Traversy Media",
           "note": "Real architecture decisions from AWS engineers."
         }
       ]
