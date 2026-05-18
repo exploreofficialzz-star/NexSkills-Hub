@@ -171,22 +171,10 @@ class RssService {
 
   static String? _extractImageFromHtml(String html) {
     if (html.isEmpty) return null;
-    final regex = RegExp(
-        r'<img[^>]+src=["\'](https?://[^"\'\\s]+)["\']',
-        caseSensitive: false);
+    // Double-quoted src="https://..." — covers the vast majority of RSS HTML
+    final regex = RegExp('<img[^>]+src="(http[^"]+)"', caseSensitive: false);
     final match = regex.firstMatch(html);
-    final src   = match?.group(1);
+    final src = match?.group(1);
     if (src == null || src.startsWith('data:')) return null;
     return src;
   }
-
-  static String _stripHtml(String html) =>
-      html.replaceAll(RegExp(r'<[^>]*>'), '').trim();
-}
-
-// ─── Isolate message ──────────────────────────────────────────────────────────
-class _ParseArgs {
-  final ContentSource source;
-  final String body;
-  const _ParseArgs({required this.source, required this.body});
-}
