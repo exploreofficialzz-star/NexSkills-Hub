@@ -8,10 +8,6 @@ import '../../core/services/ad_manager.dart';
 import '../../core/services/content_health_service.dart';
 import 'content_viewer_screen.dart';
 
-/// Section key for lesson-tap counter — persisted in Hive (separate from
-/// path-card counter so they track independently, per Section 3.2).
-const _kLessonTapSection = 'lesson_taps';
-
 class PathDetailScreen extends StatefulWidget {
   final LearningPath path;
   final VoidCallback? onStepComplete;
@@ -31,25 +27,22 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
     _progress = HiveService.getProgress();
   }
 
-  /// Open a lesson step — applies every-other-tap interstitial rule.
-  /// If the step is locked/premium, offers a rewarded ad to unlock.
+  /// Open a lesson step.
+  /// Aggressive: attempts interstitial on EVERY tap (60s cooldown guards frequency).
+  /// This naturally results in an ad every 1–2 lessons.
   void _openStep(PathStep step, {bool isPremiumLocked = false}) {
     if (isPremiumLocked) {
-      // Offer rewarded ad to temporarily unlock the lesson (Section 3.2c)
       _showRewardedUnlock(step);
       return;
     }
-
-    // Skip ad entirely if content is marked unavailable (Section 3.3 + 5.5)
-    final unavailable = ContentHealthService.isUnavailable(step.url);
-    if (unavailable) {
+    if (ContentHealthService.isUnavailable(step.url)) {
       _showUnavailableDialog(step);
       return;
     }
 
-    // Every-other-tap interstitial — tap 1: ad, tap 2: skip, tap 3: ad…
-    AdManager.instance.showInterstitialForSection(
-      _kLessonTapSection,
+    // Attempt interstitial on every tap — 60s cooldown in AdManager ensures
+    // the user doesn't see more than one ad per minute.
+    AdManager.instance.showInterstitial(
       onDismissed: () => _navigateToContent(step),
     );
   }
@@ -87,15 +80,9 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Content Unavailable'),
-        content: Text(
-          '"${step.title}" is currently unavailable. '
-          'Would you like to report this broken link?',
-        ),
+        content: Text('"${step.title}" is currently unavailable. Would you like to report this?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Dismiss'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Dismiss')),
           TextButton(
             onPressed: () {
               ContentHealthService.reportBrokenLink(step.url, step.title);
@@ -132,8 +119,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
                   final isLocked = !isDone &&
                       step.order > 1 &&
                       !completed.contains(step.order - 1);
-                  final isUnavailable =
-                      ContentHealthService.isUnavailable(step.url);
+                  final isUnavailable = ContentHealthService.isUnavailable(step.url);
 
                   return _StepTile(
                     step: step,
@@ -182,8 +168,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: levelColor.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(8),
@@ -191,30 +176,23 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
                     child: Text(
                       widget.path.level.toUpperCase(),
                       style: TextStyle(
-                          color: levelColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5),
+                          color: levelColor, fontSize: 11,
+                          fontWeight: FontWeight.w700, letterSpacing: 0.5),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(widget.path.title,
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5)),
+                          color: Colors.white, fontSize: 26,
+                          fontWeight: FontWeight.w800, letterSpacing: -0.5)),
                   const SizedBox(height: 8),
                   Text('${completed.length} / $total lessons complete',
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.75), fontSize: 13)),
+                      style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13)),
                   const SizedBox(height: 10),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: total > 0
-                          ? (completed.length / total).clamp(0.0, 1.0)
-                          : 0,
+                      value: total > 0 ? (completed.length / total).clamp(0.0, 1.0) : 0,
                       backgroundColor: Colors.white.withOpacity(0.2),
                       color: Colors.white,
                       minHeight: 5,
@@ -234,36 +212,25 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
 class _RewardedUnlockDialog extends StatelessWidget {
   final PathStep step;
   final VoidCallback onUnlocked;
-
-  const _RewardedUnlockDialog({
-    required this.step,
-    required this.onUnlocked,
-  });
+  const _RewardedUnlockDialog({required this.step, required this.onUnlocked});
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
-        children: [
-          Text('🎬', style: TextStyle(fontSize: 24)),
-          SizedBox(width: 8),
-          Text('Unlock Lesson'),
-        ],
-      ),
-      content: Text(
-        'Watch a short ad to unlock "${step.title}" for this session.',
-      ),
+      title: const Row(children: [
+        Text('🎬', style: TextStyle(fontSize: 24)),
+        SizedBox(width: 8),
+        Text('Unlock Lesson'),
+      ]),
+      content: Text('Watch a short ad to unlock "${step.title}" for this session.'),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Not now'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Not now')),
         ElevatedButton(
           onPressed: () {
             Navigator.pop(context);
             AdManager.instance.showRewarded(
               onEarned: (_) => onUnlocked(),
-              onDismissed: () {}, // user may skip — that's fine
+              onDismissed: () {},
             );
           },
           child: const Text('Watch Ad'),
@@ -301,9 +268,7 @@ class _StepTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDone
               ? NexColors.success.withOpacity(0.07)
-              : isLocked
-                  ? c.surface
-                  : c.card,
+              : isLocked ? c.surface : c.card,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isUnavailable
@@ -328,17 +293,14 @@ class _StepTile extends StatelessWidget {
                     children: [
                       Text('Step ${step.order}',
                           style: TextStyle(
-                              color: isLocked
-                                  ? c.textMuted
-                                  : NexColors.primary,
+                              color: isLocked ? c.textMuted : NexColors.primary,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.3)),
                       if (isUnavailable) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: NexColors.error.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(4),
@@ -355,9 +317,7 @@ class _StepTile extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(step.title,
                       style: TextStyle(
-                          color: isLocked || isUnavailable
-                              ? c.textMuted
-                              : c.textPrimary,
+                          color: isLocked || isUnavailable ? c.textMuted : c.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                           height: 1.3)),
@@ -368,10 +328,8 @@ class _StepTile extends StatelessWidget {
                           style: const TextStyle(fontSize: 12)),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(
-                            '${step.sourceName} · ${step.duration}',
-                            style:
-                                TextStyle(color: c.textMuted, fontSize: 12),
+                        child: Text('${step.sourceName} · ${step.duration}',
+                            style: TextStyle(color: c.textMuted, fontSize: 12),
                             overflow: TextOverflow.ellipsis),
                       ),
                     ],
@@ -396,8 +354,7 @@ class _StepTile extends StatelessWidget {
             else if (isDone)
               const Icon(Icons.check_circle, color: NexColors.success, size: 24)
             else
-              const Icon(Icons.play_circle_outline,
-                  color: NexColors.primary, size: 24),
+              const Icon(Icons.play_circle_outline, color: NexColors.primary, size: 24),
           ],
         ),
       ),
@@ -412,19 +369,13 @@ class _StepTile extends StatelessWidget {
         shape: BoxShape.circle,
         color: isDone
             ? NexColors.success.withOpacity(0.15)
-            : isLocked
-                ? c.border
-                : NexColors.primary.withOpacity(0.15),
+            : isLocked ? c.border : NexColors.primary.withOpacity(0.15),
       ),
       child: Center(
         child: Text(
           isDone ? '✓' : '${step.order}',
           style: TextStyle(
-            color: isDone
-                ? NexColors.success
-                : isLocked
-                    ? c.textMuted
-                    : NexColors.primary,
+            color: isDone ? NexColors.success : isLocked ? c.textMuted : NexColors.primary,
             fontSize: 14,
             fontWeight: FontWeight.w800,
           ),

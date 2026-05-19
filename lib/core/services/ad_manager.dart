@@ -6,60 +6,64 @@ import 'hive_service.dart';
 
 /// AdManager — centralized ad orchestration singleton.
 ///
-/// Responsibilities:
-///   - Every-other-tap interstitial rule per named section
-///   - 60-second global interstitial cooldown (AdMob policy minimum)
-///   - Auto-reload immediately after each ad is dismissed
-///   - Per-section tap counters persisted in Hive across restarts
-///   - Test IDs in debug mode, real IDs in release
-///   - NEVER blocks navigation — [onDismissed] is always called
+/// Strategy (aggressive, per product spec):
+///   • Interstitial attempted on EVERY lesson tap and EVERY content click.
+///   • 60-second global cooldown (AdMob policy minimum) prevents back-to-back ads.
+///   • Auto-reload immediately after each ad is dismissed.
+///   • Premium users: zero ads, all paths bypass immediately.
+///   • App-open ads: NOT included per product decision.
+///   • Tab-switch ads: NOT included per product decision.
+///
+/// Ad formats included:
+///   ✓ Banner (sticky footer + inline)
+///   ✓ Interstitial (lessons + content clicks)
+///   ✓ Rewarded (locked lesson unlock)
+///   ✓ Rewarded Interstitial (XP boost, opt-in)
+///   ✗ App-open (excluded per product decision)
 class AdManager {
   AdManager._();
   static final AdManager instance = AdManager._();
 
-  static const _tapCounterBox = 'ad_tap_counters';
-
-  // ── Test IDs (Google's official test units) ──────────────────
+  // ── Test IDs (Google official) ─────────────────────────────────
   static const _testInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
-  static const _testRewardedId = 'ca-app-pub-3940256099942544/5224354917';
-  static const _testBannerId = 'ca-app-pub-3940256099942544/6300978111';
-  static const _testRewardedIntId = 'ca-app-pub-3940256099942544/5354046379';
+  static const _testRewardedId     = 'ca-app-pub-3940256099942544/5224354917';
+  static const _testBannerId       = 'ca-app-pub-3940256099942544/6300978111';
+  static const _testRewardedIntId  = 'ca-app-pub-3940256099942544/5354046379';
+  static const _testNativeId       = 'ca-app-pub-3940256099942544/2247696110';
 
-  // ── Real IDs — replace with values from AdMob console ────────
+  // ── Real IDs — replace before release ─────────────────────────
   static const _realInterstitialId = 'ca-app-pub-REPLACE/REPLACE';
-  static const _realRewardedId = 'ca-app-pub-REPLACE/REPLACE';
-  static const _realBannerId = 'ca-app-pub-REPLACE/REPLACE';
-  static const _realRewardedIntId = 'ca-app-pub-REPLACE/REPLACE';
+  static const _realRewardedId     = 'ca-app-pub-REPLACE/REPLACE';
+  static const _realBannerId       = 'ca-app-pub-REPLACE/REPLACE';
+  static const _realRewardedIntId  = 'ca-app-pub-REPLACE/REPLACE';
+  static const _realNativeId       = 'ca-app-pub-REPLACE/REPLACE';
 
-  String get _interstitialId =>
-      kDebugMode ? _testInterstitialId : _realInterstitialId;
-  String get _rewardedId => kDebugMode ? _testRewardedId : _realRewardedId;
-  String get _bannerId => kDebugMode ? _testBannerId : _realBannerId;
-  String get _rewardedIntId =>
-      kDebugMode ? _testRewardedIntId : _realRewardedIntId;
+  String get _interstitialId => kDebugMode ? _testInterstitialId : _realInterstitialId;
+  String get _rewardedId     => kDebugMode ? _testRewardedId     : _realRewardedId;
+  String get _bannerId       => kDebugMode ? _testBannerId       : _realBannerId;
+  String get _rewardedIntId  => kDebugMode ? _testRewardedIntId  : _realRewardedIntId;
+  String get _nativeId       => kDebugMode ? _testNativeId       : _realNativeId;
 
-  // ── Ad instances ─────────────────────────────────────────────
-  InterstitialAd? _interstitial;
-  RewardedAd? _rewarded;
+  // ── Ad instances ───────────────────────────────────────────────
+  InterstitialAd?         _interstitial;
+  RewardedAd?             _rewarded;
   RewardedInterstitialAd? _rewardedInterstitial;
 
   bool _interstitialLoading = false;
-  bool _rewardedLoading = false;
-  bool _rewardedIntLoading = false;
+  bool _rewardedLoading     = false;
+  bool _rewardedIntLoading  = false;
 
+  // 60-second global interstitial cooldown (AdMob policy minimum)
   DateTime? _lastInterstitialShownAt;
-  static const _cooldownSeconds = 60; // AdMob policy minimum
+  static const _cooldownSeconds = 60;
 
   bool get isInterstitialReady => _interstitial != null;
-  bool get isRewardedReady => _rewarded != null;
+  bool get isRewardedReady     => _rewarded != null;
 
   static const _request = AdRequest();
 
-  // ── Init — call ONLY from postFrameCallback, never in main() ─
+  // ── Init — called from HomeScreen postFrameCallback only ───────
   Future<void> init() async {
-    if (!Hive.isBoxOpen(_tapCounterBox)) {
-      await Hive.openBox<int>(_tapCounterBox);
-    }
     loadInterstitial();
     loadRewarded();
     loadRewardedInterstitial();
@@ -85,9 +89,14 @@ class AdManager {
     );
   }
 
-  /// Show interstitial. [onDismissed] is ALWAYS called — navigation is
-  /// never blocked even if the ad fails or the cooldown is active.
-  /// Returns true if an ad was actually shown.
+  /// Attempt to show an interstitial.
+  ///
+  /// [onDismissed] is ALWAYS called — navigation is never blocked.
+  /// Returns true if an ad was actually displayed.
+  ///
+  /// Aggressive: call this on every lesson tap and every content click.
+  /// The 60-second cooldown prevents back-to-back ads while keeping
+  /// the experience monetised at the maximum allowable frequency.
   Future<bool> showInterstitial({VoidCallback? onDismissed}) async {
     final progress = HiveService.getProgress();
     if (progress.isPremium) {
@@ -97,8 +106,7 @@ class AdManager {
 
     // 60-second global cooldown
     if (_lastInterstitialShownAt != null) {
-      final elapsed =
-          DateTime.now().difference(_lastInterstitialShownAt!).inSeconds;
+      final elapsed = DateTime.now().difference(_lastInterstitialShownAt!).inSeconds;
       if (elapsed < _cooldownSeconds) {
         onDismissed?.call();
         return false;
@@ -106,7 +114,7 @@ class AdManager {
     }
 
     if (_interstitial == null) {
-      loadInterstitial();
+      loadInterstitial(); // start preloading for next time
       onDismissed?.call();
       return false;
     }
@@ -116,7 +124,7 @@ class AdManager {
         ad.dispose();
         _interstitial = null;
         _lastInterstitialShownAt = DateTime.now();
-        loadInterstitial(); // pre-load next immediately
+        loadInterstitial(); // reload immediately after dismiss
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
@@ -130,56 +138,24 @@ class AdManager {
     return true;
   }
 
-  /// Show interstitial with a [timeout] fallback. If the ad is not ready
-  /// in time, [onDismissed] fires immediately so navigation is never blocked.
+  /// Show interstitial with a timeout fallback.
+  /// If the ad is not ready within [timeout], [onDismissed] fires
+  /// immediately so navigation is never blocked.
   Future<void> showInterstitialWithTimeout({
     required VoidCallback onDismissed,
     Duration timeout = const Duration(seconds: 3),
   }) async {
     if (_interstitial == null) {
       loadInterstitial();
-      // Wait briefly for the ad, then navigate regardless
       await Future.delayed(timeout);
       onDismissed();
       return;
     }
-    // Ad is ready — show it, onDismissed fires after it closes
     await showInterstitial(onDismissed: onDismissed);
   }
 
-  /// Every-other-tap interstitial for a named section.
-  ///
-  /// Tap counter is persisted in Hive so it survives restarts.
-  /// Odd taps (1, 3, 5…) → show interstitial.
-  /// Even taps (2, 4, 6…) → skip ad, navigate immediately.
-  ///
-  /// [sectionKey] — unique string per section, e.g. 'path_cards', 'lesson_taps'.
-  Future<void> showInterstitialForSection(
-    String sectionKey, {
-    required VoidCallback onDismissed,
-  }) async {
-    final progress = HiveService.getProgress();
-    if (progress.isPremium) {
-      onDismissed();
-      return;
-    }
-
-    // Read and increment the per-section counter
-    final box = Hive.box<int>(_tapCounterBox);
-    final current = box.get(sectionKey, defaultValue: 0)!;
-    final next = current + 1;
-    await box.put(sectionKey, next);
-
-    // Odd taps → ad; even taps → skip
-    if (next % 2 == 1) {
-      await showInterstitial(onDismissed: onDismissed);
-    } else {
-      onDismissed();
-    }
-  }
-
   // ─────────────────────────────────────────────────────────────
-  // REWARDED
+  // REWARDED  (locked lesson unlock — opt-in only)
   // ─────────────────────────────────────────────────────────────
   Future<void> loadRewarded() async {
     if (_rewardedLoading || _rewarded != null) return;
@@ -188,10 +164,7 @@ class AdManager {
       adUnitId: _rewardedId,
       request: _request,
       rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewarded = ad;
-          _rewardedLoading = false;
-        },
+        onAdLoaded: (ad) { _rewarded = ad; _rewardedLoading = false; },
         onAdFailedToLoad: (_) => _rewardedLoading = false,
       ),
     );
@@ -201,26 +174,15 @@ class AdManager {
     required void Function(RewardItem) onEarned,
     VoidCallback? onDismissed,
   }) async {
-    if (HiveService.getProgress().isPremium) {
-      onDismissed?.call();
-      return;
-    }
-    if (_rewarded == null) {
-      loadRewarded();
-      onDismissed?.call();
-      return;
-    }
+    if (HiveService.getProgress().isPremium) { onDismissed?.call(); return; }
+    if (_rewarded == null) { loadRewarded(); onDismissed?.call(); return; }
     _rewarded!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _rewarded = null;
-        loadRewarded();
+        ad.dispose(); _rewarded = null; loadRewarded();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _rewarded = null;
-        loadRewarded();
+        ad.dispose(); _rewarded = null; loadRewarded();
         onDismissed?.call();
       },
     );
@@ -228,7 +190,7 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // REWARDED INTERSTITIAL  (opt-in only — Progress tab XP boost)
+  // REWARDED INTERSTITIAL  (XP boost — opt-in only)
   // ─────────────────────────────────────────────────────────────
   Future<void> loadRewardedInterstitial() async {
     if (_rewardedIntLoading || _rewardedInterstitial != null) return;
@@ -237,10 +199,7 @@ class AdManager {
       adUnitId: _rewardedIntId,
       request: _request,
       rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewardedInterstitial = ad;
-          _rewardedIntLoading = false;
-        },
+        onAdLoaded: (ad) { _rewardedInterstitial = ad; _rewardedIntLoading = false; },
         onAdFailedToLoad: (_) => _rewardedIntLoading = false,
       ),
     );
@@ -250,44 +209,37 @@ class AdManager {
     required void Function(RewardItem) onEarned,
     VoidCallback? onDismissed,
   }) async {
-    if (HiveService.getProgress().isPremium) {
-      onDismissed?.call();
-      return;
-    }
+    if (HiveService.getProgress().isPremium) { onDismissed?.call(); return; }
     if (_rewardedInterstitial == null) {
-      loadRewardedInterstitial();
-      onDismissed?.call();
-      return;
+      loadRewardedInterstitial(); onDismissed?.call(); return;
     }
-    _rewardedInterstitial!.fullScreenContentCallback =
-        FullScreenContentCallback(
+    _rewardedInterstitial!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _rewardedInterstitial = null;
-        loadRewardedInterstitial();
+        ad.dispose(); _rewardedInterstitial = null; loadRewardedInterstitial();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _rewardedInterstitial = null;
-        loadRewardedInterstitial();
+        ad.dispose(); _rewardedInterstitial = null; loadRewardedInterstitial();
         onDismissed?.call();
       },
     );
-    await _rewardedInterstitial!
-        .show(onUserEarnedReward: (_, r) => onEarned(r));
+    await _rewardedInterstitial!.show(onUserEarnedReward: (_, r) => onEarned(r));
   }
 
   // ─────────────────────────────────────────────────────────────
-  // BANNER
+  // BANNER  (created on demand per screen)
   // ─────────────────────────────────────────────────────────────
   BannerAd createBannerAd([AdSize size = AdSize.banner]) => BannerAd(
         adUnitId: _bannerId,
         size: size,
         request: _request,
-        listener:
-            BannerAdListener(onAdFailedToLoad: (ad, _) => ad.dispose()),
+        listener: BannerAdListener(onAdFailedToLoad: (ad, _) => ad.dispose()),
       );
+
+  // ─────────────────────────────────────────────────────────────
+  // NATIVE  (created on demand per slot in Explore)
+  // ─────────────────────────────────────────────────────────────
+  String get nativeAdUnitId => _nativeId;
 
   // ─────────────────────────────────────────────────────────────
   // CLEANUP

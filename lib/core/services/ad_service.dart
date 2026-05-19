@@ -5,62 +5,37 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../constants/app_constants.dart';
 import 'hive_service.dart';
 
-/// Production AdService — all real ad unit IDs, maximum revenue.
+/// AdService — SDK initialisation + legacy ad helpers.
 ///
-/// Ad units wired:
-///   Banner                — Today, Explore (every 4 items), Progress
-///   Interstitial          — every content open, every tab switch
-///   Rewarded              — streak save, bonus XP after lesson
-///   Rewarded Interstitial — lesson complete dialog (non-blocking)
-///   App-open              — cold resume after 30+ min background
-///
-/// Policy compliance:
-///   • 90s minimum between interstitials (policy min = 60s)
-///   • Never on back-press
-///   • Always user-action triggered
-///   • Premium users never see any ads
-///
-/// NOTE: Call [initializeSdkOnly] from main() — it does NOT preload ads.
-/// Ad preloading is handled by AdManager.init() from a postFrameCallback
-/// in HomeScreen, so ads are never loaded before the first frame renders.
-
+/// App-open ads are intentionally NOT included per product decision.
+/// All interstitial/rewarded orchestration is in AdManager.
 class AdService {
   static InterstitialAd? _interstitialAd;
   static RewardedAd? _rewardedAd;
   static RewardedInterstitialAd? _rewardedInterstitialAd;
-  static AppOpenAd? _appOpenAd;
 
   static bool _interstitialLoading = false;
   static bool _rewardedLoading = false;
   static bool _rewardedInterstitialLoading = false;
-  static bool _appOpenLoading = false;
-  static DateTime? _appOpenLoadedAt;
 
-  // ── IDs — production ──────────────────────────────────────────
   static String get _bannerId =>
       Platform.isIOS ? AdConstants.iosBannerId : AdConstants.androidBannerId;
 
   static String get _interstitialId =>
-      Platform.isIOS
-          ? AdConstants.iosInterstitialId
-          : AdConstants.androidInterstitialId;
+      Platform.isIOS ? AdConstants.iosInterstitialId : AdConstants.androidInterstitialId;
 
   static String get _rewardedId =>
       Platform.isIOS ? AdConstants.iosRewardedId : AdConstants.androidRewardedId;
 
   static String get _rewardedInterstitialId =>
-      Platform.isIOS
-          ? AdConstants.iosRewardedInterstitialId
-          : AdConstants.androidRewardedInterstitialId;
-
-  static String get _appOpenId =>
-      Platform.isIOS ? AdConstants.iosAppOpenId : AdConstants.androidAppOpenId;
+      Platform.isIOS ? AdConstants.iosRewardedInterstitialId : AdConstants.androidRewardedInterstitialId;
 
   static const AdRequest _request = AdRequest();
 
-  // ─── SDK Init only (no ad loading) ────────────────────────────
-  /// Call this from main() — initializes the MobileAds SDK but does NOT
-  /// load any ads. Ad loading happens post-first-frame via AdManager.
+  // ── SDK init only — call from main() before runApp ────────────
+  /// Initialises the MobileAds SDK but does NOT load any ad creatives.
+  /// Ad loading happens post-first-frame via AdManager to comply with
+  /// AdMob policy (no ads before first frame renders).
   static Future<void> initializeSdkOnly() async {
     await MobileAds.instance.initialize();
     MobileAds.instance.updateRequestConfiguration(RequestConfiguration(
@@ -69,22 +44,21 @@ class AdService {
     ));
   }
 
-  /// Legacy entry point — kept for compatibility.
-  /// Now redirects to [initializeSdkOnly]; preloading is moved to AdManager.
+  /// Legacy entry point kept for compatibility.
   static Future<void> initialize() async => initializeSdkOnly();
 
-  static void _preloadAll() {
+  /// Called from HomeScreen postFrameCallback — safe to start loading creatives.
+  static void preloadAllPostFrame() {
     _preloadInterstitial();
     _preloadRewarded();
     _preloadRewardedInterstitial();
-    _preloadAppOpen();
+    // App-open ads: intentionally not preloaded per product decision.
   }
 
-  // ─── ADAPTIVE BANNER ──────────────────────────────────────────
+  // ── Adaptive / standard banner ─────────────────────────────────
   static Future<BannerAd> createAdaptiveBanner(BuildContext context) async {
     final width = MediaQuery.of(context).size.width.truncate();
-    final size =
-        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+    final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
     return BannerAd(
       adUnitId: _bannerId,
       size: size ?? AdSize.banner,
@@ -97,11 +71,10 @@ class AdService {
         adUnitId: _bannerId,
         size: AdSize.banner,
         request: _request,
-        listener:
-            BannerAdListener(onAdFailedToLoad: (ad, _) => ad.dispose()),
+        listener: BannerAdListener(onAdFailedToLoad: (ad, _) => ad.dispose()),
       );
 
-  // ─── INTERSTITIAL ─────────────────────────────────────────────
+  // ── Interstitial ───────────────────────────────────────────────
   static void _preloadInterstitial() {
     if (_interstitialLoading || _interstitialAd != null) return;
     _interstitialLoading = true;
@@ -119,16 +92,13 @@ class AdService {
     );
   }
 
-  /// Show interstitial. ONLY gate = 90s cooldown + premium check.
-  /// [onDismissed] always called — navigation is NEVER blocked.
-  static Future<bool> showInterstitial(
-      {VoidCallback? onDismissed, String? contentId}) async {
+  /// [onDismissed] is always called — navigation is never blocked.
+  static Future<bool> showInterstitial({
+    VoidCallback? onDismissed,
+    String? contentId,
+  }) async {
     final progress = HiveService.getProgress();
-    if (progress.isPremium) {
-      onDismissed?.call();
-      return false;
-    }
-    if (!progress.canShowInterstitial) {
+    if (progress.isPremium || !progress.canShowInterstitial) {
       onDismissed?.call();
       return false;
     }
@@ -137,7 +107,6 @@ class AdService {
       onDismissed?.call();
       return false;
     }
-
     _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
@@ -157,10 +126,7 @@ class AdService {
     return true;
   }
 
-  /// Fire-and-forget for tab switches — no navigation callback needed.
-  static void showInterstitialForTabSwitch() => showInterstitial();
-
-  // ─── REWARDED ─────────────────────────────────────────────────
+  // ── Rewarded ───────────────────────────────────────────────────
   static void _preloadRewarded() {
     if (_rewardedLoading || _rewardedAd != null) return;
     _rewardedLoading = true;
@@ -168,10 +134,7 @@ class AdService {
       adUnitId: _rewardedId,
       request: _request,
       rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewardedAd = ad;
-          _rewardedLoading = false;
-        },
+        onAdLoaded: (ad) { _rewardedAd = ad; _rewardedLoading = false; },
         onAdFailedToLoad: (_) => _rewardedLoading = false,
       ),
     );
@@ -182,21 +145,14 @@ class AdService {
     VoidCallback? onDismissed,
   }) async {
     if (HiveService.getProgress().isPremium) return false;
-    if (_rewardedAd == null) {
-      _preloadRewarded();
-      return false;
-    }
+    if (_rewardedAd == null) { _preloadRewarded(); return false; }
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _rewardedAd = null;
-        _preloadRewarded();
+        ad.dispose(); _rewardedAd = null; _preloadRewarded();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _rewardedAd = null;
-        _preloadRewarded();
+        ad.dispose(); _rewardedAd = null; _preloadRewarded();
         onDismissed?.call();
       },
     );
@@ -204,7 +160,7 @@ class AdService {
     return true;
   }
 
-  // ─── REWARDED INTERSTITIAL ────────────────────────────────────
+  // ── Rewarded Interstitial ──────────────────────────────────────
   static void _preloadRewardedInterstitial() {
     if (_rewardedInterstitialLoading || _rewardedInterstitialAd != null) return;
     _rewardedInterstitialLoading = true;
@@ -212,10 +168,7 @@ class AdService {
       adUnitId: _rewardedInterstitialId,
       request: _request,
       rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewardedInterstitialAd = ad;
-          _rewardedInterstitialLoading = false;
-        },
+        onAdLoaded: (ad) { _rewardedInterstitialAd = ad; _rewardedInterstitialLoading = false; },
         onAdFailedToLoad: (_) => _rewardedInterstitialLoading = false,
       ),
     );
@@ -230,90 +183,29 @@ class AdService {
       _preloadRewardedInterstitial();
       return false;
     }
-    _rewardedInterstitialAd!.fullScreenContentCallback =
-        FullScreenContentCallback(
+    _rewardedInterstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _rewardedInterstitialAd = null;
-        _preloadRewardedInterstitial();
+        ad.dispose(); _rewardedInterstitialAd = null; _preloadRewardedInterstitial();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _rewardedInterstitialAd = null;
-        _preloadRewardedInterstitial();
+        ad.dispose(); _rewardedInterstitialAd = null; _preloadRewardedInterstitial();
         onDismissed?.call();
       },
     );
-    await _rewardedInterstitialAd!
-        .show(onUserEarnedReward: (_, r) => onRewarded(r));
+    await _rewardedInterstitialAd!.show(onUserEarnedReward: (_, r) => onRewarded(r));
     return true;
   }
-
-  // ─── APP-OPEN ─────────────────────────────────────────────────
-  static void _preloadAppOpen() {
-    if (_appOpenLoading || _appOpenAd != null) return;
-    _appOpenLoading = true;
-    AppOpenAd.load(
-      adUnitId: _appOpenId,
-      request: _request,
-      adLoadCallback: AppOpenAdLoadCallback(
-        onAdLoaded: (ad) {
-          _appOpenAd = ad;
-          _appOpenLoading = false;
-          _appOpenLoadedAt = DateTime.now();
-        },
-        onAdFailedToLoad: (_) => _appOpenLoading = false,
-      ),
-    );
-  }
-
-  static bool get _appOpenIsValid =>
-      _appOpenAd != null &&
-      _appOpenLoadedAt != null &&
-      DateTime.now().difference(_appOpenLoadedAt!).inHours < 4;
-
-  static Future<void> showAppOpenIfReady() async {
-    if (HiveService.getProgress().isPremium) return;
-    if (!_appOpenIsValid) {
-      _preloadAppOpen();
-      return;
-    }
-    _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _appOpenAd = null;
-        _preloadAppOpen();
-      },
-      onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _appOpenAd = null;
-        _preloadAppOpen();
-      },
-    );
-    await _appOpenAd!.show();
-  }
-
-  /// Called from HomeScreen's postFrameCallback — safe point to start
-  /// loading all ad formats without blocking the first frame.
-  static void preloadAllPostFrame() => _preloadAll();
 
   static void dispose() {
     _interstitialAd?.dispose();
     _rewardedAd?.dispose();
     _rewardedInterstitialAd?.dispose();
-    _appOpenAd?.dispose();
   }
 }
 
-// ─── Lifecycle observer ───────────────────────────────────────────────────────
+// ── Lifecycle observer (app-resume handler) ────────────────────────────────────
 class AdLifecycleObserver {
-  static DateTime? _backgroundedAt;
-  static void onPause() => _backgroundedAt = DateTime.now();
-  static Future<void> onResume() async {
-    if (_backgroundedAt == null) return;
-    final away = DateTime.now().difference(_backgroundedAt!).inSeconds;
-    if (away > 1800) await AdService.showAppOpenIfReady();
-    _backgroundedAt = null;
-  }
+  static void onPause() {}   // Nothing to do — no app-open ad
+  static void onResume() {}  // Nothing to do — no app-open ad
 }

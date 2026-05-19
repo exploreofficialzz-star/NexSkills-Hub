@@ -23,22 +23,10 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _navController;
 
   static const _items = [
-    _NavItem(
-        icon: Icons.today_outlined,
-        activeIcon: Icons.today,
-        label: 'Today'),
-    _NavItem(
-        icon: Icons.route_outlined,
-        activeIcon: Icons.route,
-        label: 'My Path'),
-    _NavItem(
-        icon: Icons.explore_outlined,
-        activeIcon: Icons.explore,
-        label: 'Explore'),
-    _NavItem(
-        icon: Icons.bar_chart_outlined,
-        activeIcon: Icons.bar_chart,
-        label: 'Progress'),
+    _NavItem(icon: Icons.today_outlined,      activeIcon: Icons.today,      label: 'Today'),
+    _NavItem(icon: Icons.route_outlined,      activeIcon: Icons.route,      label: 'My Path'),
+    _NavItem(icon: Icons.explore_outlined,    activeIcon: Icons.explore,    label: 'Explore'),
+    _NavItem(icon: Icons.bar_chart_outlined,  activeIcon: Icons.bar_chart,  label: 'Progress'),
   ];
 
   @override
@@ -49,14 +37,11 @@ class _HomeScreenState extends State<HomeScreen>
       duration: const Duration(milliseconds: 300),
     );
 
-    // ── Post-frame: safe to load ads and run background tasks ────
-    // Ads are NEVER loaded before the first frame (policy + Section 1.6).
+    // Post-frame: safe to load ads and run background tasks.
+    // Ads are NEVER loaded before the first frame (AdMob policy).
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // 1. Preload all ad formats via AdManager (60s cooldown guard)
       await AdManager.instance.init();
-      // 2. Also preload AppOpen + legacy AdService ad slots
       AdService.preloadAllPostFrame();
-      // 3. Run the daily content health check in the background
       ContentHealthService.runDailyCheckInBackground();
     });
   }
@@ -69,13 +54,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _onTap(int i) {
     if (i == _currentIndex) return;
-
-    // Interstitial on tab switch (user-action triggered, 60s cooldown in AdManager)
-    final progress = HiveService.getProgress();
-    if (!progress.isPremium && progress.canShowInterstitial) {
-      AdService.showInterstitialForTabSwitch();
-    }
-
+    // NO interstitial on tab switch — user explicitly requested removal
     setState(() => _currentIndex = i);
     _navController.forward(from: 0);
   }
@@ -91,7 +70,6 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-
     return Scaffold(
       backgroundColor: c.background,
       extendBody: true,
@@ -111,7 +89,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// ─── Floating nav ─────────────────────────────────────────────────────────────
 class _FloatingNav extends StatelessWidget {
   final int currentIndex;
   final List<_NavItem> items;
@@ -164,8 +141,7 @@ class _FloatingNav extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 8),
+                    margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                     decoration: BoxDecoration(
                       color: selected
                           ? NexColors.primary.withOpacity(0.12)
@@ -183,8 +159,7 @@ class _FloatingNav extends StatelessWidget {
                               Transform.scale(scale: scale, child: child),
                           child: Icon(
                             selected ? items[i].activeIcon : items[i].icon,
-                            color:
-                                selected ? NexColors.primary : c.textMuted,
+                            color: selected ? NexColors.primary : c.textMuted,
                             size: 24,
                           ),
                         ),
@@ -192,12 +167,9 @@ class _FloatingNav extends StatelessWidget {
                         AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 180),
                           style: TextStyle(
-                            color:
-                                selected ? NexColors.primary : c.textMuted,
+                            color: selected ? NexColors.primary : c.textMuted,
                             fontSize: 11,
-                            fontWeight: selected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                           ),
                           child: Text(items[i].label),
                         ),
@@ -228,9 +200,5 @@ class _NavItem {
   final IconData icon;
   final IconData activeIcon;
   final String label;
-  const _NavItem({
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-  });
+  const _NavItem({required this.icon, required this.activeIcon, required this.label});
 }

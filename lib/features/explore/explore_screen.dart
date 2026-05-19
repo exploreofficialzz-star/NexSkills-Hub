@@ -10,7 +10,6 @@ import '../../core/services/ad_manager.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
-import '../../shared/ad_block_gate.dart';
 import 'resource_viewer_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -30,22 +29,21 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _refreshing = false;
   String? _error;
 
-  // Sticky bottom banner
   BannerAd? _bottomBanner;
   bool _bottomBannerLoaded = false;
 
   static const _categories = [
-    ('all', '🌐', 'All'),
-    ('ai', '🤖', 'AI'),
+    ('all',           '🌐', 'All'),
+    ('ai',            '🤖', 'AI'),
     ('cybersecurity', '🔐', 'Cyber'),
-    ('nocode', '⚡', 'No-Code'),
-    ('data', '📊', 'Data'),
-    ('cloud', '☁️', 'Cloud'),
+    ('nocode',        '⚡', 'No-Code'),
+    ('data',          '📊', 'Data'),
+    ('cloud',         '☁️', 'Cloud'),
   ];
 
   static const _types = [
-    ('all', 'All'),
-    ('video', 'Videos'),
+    ('all',     'All'),
+    ('video',   'Videos'),
     ('article', 'Articles'),
   ];
 
@@ -69,39 +67,28 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   Future<void> _loadBottomBanner() async {
     if (HiveService.getProgress().isPremium) return;
-    if (ConnectivityService.instance.adBlocked) return;
     final ad = AdManager.instance.createBannerAd(AdSize.banner);
     await ad.load();
     if (mounted) setState(() { _bottomBanner = ad; _bottomBannerLoaded = true; });
   }
 
   void _loadFromCache() {
-    final allCats = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
+    const allCats = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
     final cached = _selectedCategory == 'all'
-        ? allCats
-            .expand((cat) => HiveService.getResourcesByCategory(cat))
-            .toList()
+        ? allCats.expand((cat) => HiveService.getResourcesByCategory(cat)).toList()
         : HiveService.getResourcesByCategory(_selectedCategory);
-
-    final sorted = _sortWithConsumedAtBottom(cached);
     if (mounted) {
       setState(() {
-        _items = sorted;
-        if (sorted.isNotEmpty) _loading = false;
+        _items = _sortWithConsumedAtBottom(cached);
+        if (cached.isNotEmpty) _loading = false;
       });
     }
   }
 
-  /// Unconsumed items first (newest-first within), consumed items last
-  /// (newest-first within). This ordering persists across refreshes. (Section 4.1c)
   List<ResourceModel> _sortWithConsumedAtBottom(List<ResourceModel> items) {
-    final unconsumed = items
-        .where((r) => !_consumedIds.contains(r.id))
-        .toList()
+    final unconsumed = items.where((r) => !_consumedIds.contains(r.id)).toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    final consumed = items
-        .where((r) => _consumedIds.contains(r.id))
-        .toList()
+    final consumed = items.where((r) => _consumedIds.contains(r.id)).toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
     return [...unconsumed, ...consumed];
   }
@@ -109,27 +96,11 @@ class _ExploreScreenState extends State<ExploreScreen>
   Future<void> _fetchFresh() async {
     if (mounted) setState(() { _refreshing = true; _error = null; });
     try {
-      final before = _items.length;
       await RssService.fetchAll();
-      // Refresh consumed set in case it changed
       _consumedIds = HiveService.getAllConsumedIds();
       _loadFromCache();
-      final added = _items.length - before;
-      if (added > 0 && mounted) {
-        final newByCategory = <String, int>{};
-        for (final cat in ['ai', 'cybersecurity', 'nocode', 'data', 'cloud']) {
-          final fresh = HiveService.getResourcesByCategory(cat).length;
-          if (fresh > 0) newByCategory[cat] = fresh;
-        }
-        try {
-          await NotificationService.showBatchContentNotification(newByCategory);
-        } catch (_) {}
-      }
     } catch (e) {
-      if (mounted) {
-        setState(
-            () => _error = 'Could not fetch content. Check your connection.');
-      }
+      if (mounted) setState(() => _error = 'Could not fetch content. Check your connection.');
     } finally {
       if (mounted) setState(() { _refreshing = false; _loading = false; });
     }
@@ -141,54 +112,45 @@ class _ExploreScreenState extends State<ExploreScreen>
       list = list.where((r) => r.category == _selectedCategory).toList();
     }
     if (_selectedType != 'all') {
-      list = list.where((r) => r.type == _selectedType).toList();
+      // Use isVideoItem getter which checks both type field AND URL pattern
+      if (_selectedType == 'video') {
+        list = list.where((r) => _isVideoItem(r)).toList();
+      } else {
+        list = list.where((r) => !_isVideoItem(r)).toList();
+      }
     }
     return list;
   }
 
+  /// Robust video detection: checks both the stored type field AND the URL.
+  /// This handles cases where type was not stored correctly in Hive.
+  bool _isVideoItem(ResourceModel r) =>
+      r.type == 'video' || r.isYoutube;
+
   void _openResource(ResourceModel resource) async {
-    // Ad-block gate check
-    final adBlocked = ConnectivityService.instance.adBlocked;
-    if (adBlocked && mounted) {
-      final progress = HiveService.getProgress();
-      if (!progress.isPremium) {
-        AdBlockGate.show(context,
-            onAllowed: () => _navigateToResource(resource),
-            onSubscribed: () => _navigateToResource(resource));
-        return;
-      }
-    }
+    // For YouTube videos, try to open in YouTube app first
+    if (_isVideoItem(resource)) {
+      final launched = await launchUrl(
+        Uri.parse(resource.url),
+        mode: LaunchMode.externalApplication,
+      ).catchError((_) => false);
 
-    // For videos — try YouTube app first (Section 4.2g)
-    if (resource.isYoutube) {
-      final launched = await _launchYouTube(resource.url);
       if (launched) {
-        // Mark as consumed after returning from external app
-        await _markConsumedAfterDelay(resource);
+        _markConsumedAfterDelay(resource);
         return;
       }
     }
 
-    // Interstitial every other content click (reuses AdManager counter)
-    AdManager.instance.showInterstitialForSection(
-      'explore_clicks',
+    // Aggressive: attempt interstitial on EVERY content click.
+    // 60s cooldown in AdManager prevents back-to-back ads.
+    AdManager.instance.showInterstitial(
       onDismissed: () => _navigateToResource(resource),
     );
   }
 
-  Future<bool> _launchYouTube(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      return launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-    return false;
-  }
-
-  /// After returning from the YouTube app, mark the item as consumed
-  /// if the user spent at least [minWatchSeconds] seconds there. (Section 4.2g)
   Future<void> _markConsumedAfterDelay(ResourceModel resource,
-      {int minWatchSeconds = 30}) async {
-    await Future.delayed(Duration(seconds: minWatchSeconds));
+      {int seconds = 30}) async {
+    await Future.delayed(Duration(seconds: seconds));
     await HiveService.markConsumed(resource.id);
     if (mounted) {
       setState(() {
@@ -202,10 +164,8 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (!mounted) return;
     Navigator.push(
       context,
-      MaterialPageRoute(
-          builder: (_) => ResourceViewerScreen(resource: resource)),
+      MaterialPageRoute(builder: (_) => ResourceViewerScreen(resource: resource)),
     ).then((_) {
-      // Mark as consumed after reading (Section 4.1a)
       HiveService.markConsumed(resource.id);
       HiveService.markRead(resource.id);
       if (mounted) {
@@ -222,23 +182,15 @@ class _ExploreScreenState extends State<ExploreScreen>
     _loadFromCache();
   }
 
-  /// Clear all consumed history — resets feed to fresh state. (Section 4.1f)
   Future<void> _clearConsumedHistory() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Clear history?'),
-        content: const Text(
-            'This resets your watched/read list so all content appears fresh again.'),
+        content: const Text('Resets your watched/read list so all content appears fresh again.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Clear')),
         ],
       ),
     );
@@ -278,7 +230,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                         child: _buildList(c),
                       ),
               ),
-              // ── Sticky bottom banner (Section 5.2) ──────────────
+              // Sticky bottom banner — free users only
               if (_bottomBannerLoaded && _bottomBanner != null)
                 _StickyBottomBanner(ad: _bottomBanner!, c: c),
             ],
@@ -299,16 +251,13 @@ class _ExploreScreenState extends State<ExploreScreen>
               children: [
                 Text('Explore',
                     style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.8)),
+                        color: c.textPrimary, fontSize: 28,
+                        fontWeight: FontWeight.w800, letterSpacing: -0.8)),
                 Text('Fresh content from top sources',
                     style: TextStyle(color: c.textMuted, fontSize: 13)),
               ],
             ),
           ),
-          // Clear history button (Section 4.1f)
           GestureDetector(
             onTap: _clearConsumedHistory,
             child: Padding(
@@ -318,13 +267,9 @@ class _ExploreScreenState extends State<ExploreScreen>
           ),
           _refreshing
               ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: NexColors.primary))
-              : GestureDetector(
-                  onTap: _fetchFresh,
-                  child: Icon(Icons.refresh, color: c.textMuted)),
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: NexColors.primary))
+              : GestureDetector(onTap: _fetchFresh, child: Icon(Icons.refresh, color: c.textMuted)),
         ],
       ),
     );
@@ -337,17 +282,11 @@ class _ExploreScreenState extends State<ExploreScreen>
         children: [
           const Icon(Icons.wifi_off, color: NexColors.error, size: 14),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(_error!,
-                style: const TextStyle(color: NexColors.error, fontSize: 12)),
-          ),
+          Expanded(child: Text(_error!, style: const TextStyle(color: NexColors.error, fontSize: 12))),
           GestureDetector(
             onTap: _fetchFresh,
             child: const Text('Retry',
-                style: TextStyle(
-                    color: NexColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
+                style: TextStyle(color: NexColors.primary, fontSize: 12, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -369,14 +308,12 @@ class _ExploreScreenState extends State<ExploreScreen>
             onTap: () => setState(() => _selectedCategory = cat.$1),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: selected ? NexColors.primary : c.card,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                    color: selected ? NexColors.primary : c.border,
-                    width: 0.5),
+                    color: selected ? NexColors.primary : c.border, width: 0.5),
               ),
               child: Text('${cat.$2} ${cat.$3}',
                   style: TextStyle(
@@ -404,14 +341,10 @@ class _ExploreScreenState extends State<ExploreScreen>
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: selected
-                      ? NexColors.accent.withOpacity(0.12)
-                      : Colors.transparent,
+                  color: selected ? NexColors.accent.withOpacity(0.12) : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: selected
-                        ? NexColors.accent
-                        : c.textMuted.withOpacity(0.3)),
+                      color: selected ? NexColors.accent : c.textMuted.withOpacity(0.3)),
                 ),
                 child: Text(t.$2,
                     style: TextStyle(
@@ -439,10 +372,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 const Text('📡', style: TextStyle(fontSize: 52)),
                 const SizedBox(height: 16),
                 Text('No content yet',
-                    style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700)),
+                    style: TextStyle(color: c.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
                 Text('Pull down to fetch latest content',
                     style: TextStyle(color: c.textMuted, fontSize: 13)),
@@ -453,23 +383,19 @@ class _ExploreScreenState extends State<ExploreScreen>
       );
     }
 
-    final progress = HiveService.getProgress();
+    final isPremium = HiveService.getProgress().isPremium;
 
-    // Build list interleaving native ad every 5 content items (Section 5.2)
+    // Interleave native ad every 5 content items
     final withAds = <dynamic>[];
     int contentCount = 0;
     for (final item in items) {
       withAds.add(item);
       contentCount++;
-      if (!progress.isPremium && contentCount % 5 == 0) {
-        withAds.add('native_ad');
-      }
+      if (!isPremium && contentCount % 5 == 0) withAds.add('native_ad');
     }
 
     return ListView.builder(
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       itemCount: withAds.length,
       itemBuilder: (_, i) {
@@ -478,26 +404,24 @@ class _ExploreScreenState extends State<ExploreScreen>
 
         final resource = item as ResourceModel;
         final isConsumed = _consumedIds.contains(resource.id);
+        final isVideo = _isVideoItem(resource);
 
-        // Long-press to clear this item's consumed status (Section 4.1f)
         return GestureDetector(
-          onLongPress: isConsumed
-              ? () async {
-                  await HiveService.clearConsumedItems(); // clear all for now
-                  if (mounted) {
-                    setState(() {
-                      _consumedIds = {};
-                      _items = _sortWithConsumedAtBottom(_items);
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('History cleared')),
-                    );
-                  }
-                }
-              : null,
+          onLongPress: isConsumed ? () async {
+            await HiveService.clearConsumedItems();
+            if (mounted) {
+              setState(() {
+                _consumedIds = {};
+                _items = _sortWithConsumedAtBottom(_items);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('History cleared')));
+            }
+          } : null,
           child: _ExploreResourceCard(
             resource: resource,
             isConsumed: isConsumed,
+            isVideo: isVideo,
             onTap: () => _openResource(resource),
             onBookmark: () => _toggleBookmark(resource),
           ),
@@ -507,25 +431,21 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 }
 
-// ─── Explore Resource Card ────────────────────────────────────────────────────
-/// Extended version of ResourceCard with:
-///   - Play button overlay on video thumbnails (Section 4.2d)
-///   - Color-differentiated Video vs Article badge (Section 4.2d)
-///   - ✓ Watched / ✓ Read chip on consumed items (Section 4.1e)
+// ─── Resource Card ────────────────────────────────────────────────────────────
 class _ExploreResourceCard extends StatelessWidget {
   final ResourceModel resource;
   final bool isConsumed;
+  final bool isVideo;
   final VoidCallback onTap;
   final VoidCallback onBookmark;
 
   const _ExploreResourceCard({
     required this.resource,
     required this.isConsumed,
+    required this.isVideo,
     required this.onTap,
     required this.onBookmark,
   });
-
-  bool get _isVideo => resource.type == 'video';
 
   @override
   Widget build(BuildContext context) {
@@ -545,32 +465,25 @@ class _ExploreResourceCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Thumbnail with play overlay for videos
-              if (resource.thumbnail != null)
-                _buildThumbnail(c),
+              if (resource.thumbnail != null) _buildThumbnail(c),
               Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Type badge + consumed chip row
                     Row(
                       children: [
                         _buildTypeBadge(),
                         if (isConsumed) ...[
                           const SizedBox(width: 8),
-                          _ConsumedChip(isVideo: _isVideo),
+                          _ConsumedChip(isVideo: isVideo),
                         ],
                         const Spacer(),
                         GestureDetector(
                           onTap: onBookmark,
                           child: Icon(
-                            resource.isBookmarked
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            color: resource.isBookmarked
-                                ? NexColors.primary
-                                : c.textMuted,
+                            resource.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                            color: resource.isBookmarked ? NexColors.primary : c.textMuted,
                             size: 20,
                           ),
                         ),
@@ -579,27 +492,21 @@ class _ExploreResourceCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(resource.title,
                         style: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            height: 1.35),
+                            color: c.textPrimary, fontSize: 15,
+                            fontWeight: FontWeight.w700, height: 1.35),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis),
-                    if (resource.description != null &&
-                        resource.description!.isNotEmpty) ...[
+                    if (resource.description != null && resource.description!.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Text(resource.description!,
-                          style: TextStyle(
-                              color: c.textMuted, fontSize: 13, height: 1.4),
+                          style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis),
                     ],
                     const SizedBox(height: 10),
                     Text(resource.sourceName,
                         style: TextStyle(
-                            color: c.textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500)),
+                            color: c.textMuted, fontSize: 12, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
@@ -614,11 +521,9 @@ class _ExploreResourceCard extends StatelessWidget {
     return Stack(
       children: [
         ClipRRect(
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(16)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           child: CachedNetworkImage(
             imageUrl: resource.thumbnail!,
-            // cacheWidth/cacheHeight to avoid oversized GPU texture uploads (Section 1.7)
             memCacheWidth: 600,
             memCacheHeight: 340,
             width: double.infinity,
@@ -628,23 +533,20 @@ class _ExploreResourceCard extends StatelessWidget {
               height: 180,
               color: c.surface,
               child: const Center(
-                  child: Icon(Icons.image_not_supported,
-                      color: Colors.grey, size: 40)),
+                  child: Icon(Icons.image_not_supported, color: Colors.grey, size: 40)),
             ),
           ),
         ),
-        // Play button overlay on videos (Section 4.2d)
-        if (_isVideo)
+        // Play button overlay on video thumbnails
+        if (isVideo)
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                 color: Colors.black.withOpacity(0.3),
               ),
               child: const Center(
-                child: Icon(Icons.play_circle_filled,
-                    color: Colors.white, size: 52),
+                child: Icon(Icons.play_circle_filled, color: Colors.white, size: 52),
               ),
             ),
           ),
@@ -653,8 +555,7 @@ class _ExploreResourceCard extends StatelessWidget {
   }
 
   Widget _buildTypeBadge() {
-    // Video badge: teal/accent color; Article badge: primary purple (Section 4.2d)
-    final isVideo = _isVideo;
+    // Video: teal badge — Article: purple badge
     final color = isVideo ? NexColors.accent : NexColors.primary;
     final label = isVideo ? '🎬 Video' : '📄 Article';
 
@@ -666,13 +567,11 @@ class _ExploreResourceCard extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.3), width: 0.5),
       ),
       child: Text(label,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+          style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
     );
   }
 }
 
-// ─── Consumed chip ────────────────────────────────────────────────────────────
 class _ConsumedChip extends StatelessWidget {
   final bool isVideo;
   const _ConsumedChip({required this.isVideo});
@@ -688,16 +587,13 @@ class _ConsumedChip extends StatelessWidget {
       child: Text(
         isVideo ? '✓ Watched' : '✓ Read',
         style: const TextStyle(
-            color: NexColors.success,
-            fontSize: 10,
-            fontWeight: FontWeight.w600),
+            color: NexColors.success, fontSize: 10, fontWeight: FontWeight.w600),
       ),
     );
   }
 }
 
-// ─── Native Ad slot ───────────────────────────────────────────────────────────
-/// Styled to match the dark card theme (Section 5.2 native ad spec).
+// ─── Native Ad Slot ───────────────────────────────────────────────────────────
 class _NativeAdSlot extends StatefulWidget {
   final NexColors c;
   const _NativeAdSlot({required this.c});
@@ -713,21 +609,11 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
   @override
   void initState() {
     super.initState();
-    _loadNativeAd();
-  }
-
-  void _loadNativeAd() {
     _ad = NativeAd(
-      // Use AdManager's banner unit ID as fallback if no native unit configured
-      adUnitId: AdManager.instance.createBannerAd().adUnitId,
+      adUnitId: AdManager.instance.nativeAdUnitId,
       listener: NativeAdListener(
-        onAdLoaded: (_) {
-          if (mounted) setState(() => _loaded = true);
-        },
-        onAdFailedToLoad: (ad, _) {
-          ad.dispose();
-          _ad = null;
-        },
+        onAdLoaded: (_) { if (mounted) setState(() => _loaded = true); },
+        onAdFailedToLoad: (ad, _) { ad.dispose(); _ad = null; },
       ),
       request: const AdRequest(),
       nativeTemplateStyle: NativeTemplateStyle(
@@ -756,33 +642,11 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
   }
 
   @override
-  void dispose() {
-    _ad?.dispose();
-    super.dispose();
-  }
+  void dispose() { _ad?.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     final c = widget.c;
-
-    if (!_loaded || _ad == null) {
-      // Fixed-size placeholder so layout doesn't shift (Section 5.5)
-      return Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        height: 80,
-        decoration: BoxDecoration(
-          color: c.card,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: c.border, width: 0.5),
-        ),
-        child: Center(
-          child: Text('Advertisement',
-              style: TextStyle(
-                  color: c.textMuted, fontSize: 10, letterSpacing: 0.5)),
-        ),
-      );
-    }
-
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       height: 80,
@@ -791,12 +655,15 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: c.border, width: 0.5),
       ),
-      child: AdWidget(ad: _ad!),
+      child: _loaded && _ad != null
+          ? AdWidget(ad: _ad!)
+          : Center(child: Text('Advertisement',
+              style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5))),
     );
   }
 }
 
-// ─── Sticky bottom banner ─────────────────────────────────────────────────────
+// ─── Sticky Bottom Banner ─────────────────────────────────────────────────────
 class _StickyBottomBanner extends StatelessWidget {
   final BannerAd ad;
   final NexColors c;
@@ -814,10 +681,8 @@ class _StickyBottomBanner extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text('Advertisement',
-                  style: TextStyle(
-                      color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
+                  style: TextStyle(color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
             ),
-            // Fixed SizedBox so layout never shifts when ad loads (Section 5.5)
             SizedBox(
               width: ad.size.width.toDouble(),
               height: ad.size.height.toDouble(),

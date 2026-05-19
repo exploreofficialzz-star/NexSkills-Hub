@@ -42,7 +42,7 @@
           "url": "https://www.promptingguide.ai/introduction/basics",
           "duration": "10 min read",
           "source": "Prompting Guide",
-          "note": "Read this after the videos \u2014 practical walkthrough."
+          "note": "Read this after the videos — practical walkthrough."
         },
         {
           "order": 5,
@@ -155,12 +155,12 @@
         },
         {
           "order": 8,
-          "title": "Deploying AI Apps to Production",
-          "type": "article",
-          "url": "https://huggingface.co/blog/deploy-llms",
-          "duration": "15 min read",
-          "source": "HuggingFace Blog",
-          "note": "Take your AI project from laptop to live."
+          "title": "Deploying AI Apps with Docker & Kubernetes",
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=X48VuDVv0do",
+          "duration": "2 hr",
+          "source": "TechWorld with Nana",
+          "note": "Containerise your model and ship it to the cloud. Step-by-step."
         }
       ]
     },
@@ -192,11 +192,11 @@
         },
         {
           "order": 3,
-          "title": "Open LLM Leaderboard \u2014 Live Benchmarks",
+          "title": "LLM Benchmarks & Performance Leaderboard",
           "type": "article",
-          "url": "https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard",
+          "url": "https://artificialanalysis.ai/",
           "duration": "10 min read",
-          "source": "HuggingFace",
+          "source": "Artificial Analysis",
           "note": "How to measure if your AI is actually good."
         }
       ]
@@ -234,7 +234,7 @@
           "url": "https://www.youtube.com/watch?v=qiQR5rTSshw",
           "duration": "15 min",
           "source": "NetworkChuck",
-          "note": "TCP/IP, DNS, HTTP \u2014 the fundamentals."
+          "note": "TCP/IP, DNS, HTTP — the fundamentals."
         },
         {
           "order": 4,
@@ -249,9 +249,9 @@
           "order": 5,
           "title": "Password Security: How Attacks Work",
           "type": "article",
-          "url": "https://krebsonsecurity.com/tag/passwords/",
+          "url": "https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/",
           "duration": "8 min read",
-          "source": "Krebs on Security",
+          "source": "OWASP",
           "note": "Real-world password attacks explained clearly."
         },
         {
@@ -321,7 +321,7 @@
       "steps": [
         {
           "order": 1,
-          "title": "Cybersecurity for Everyone \u2014 Full Intro",
+          "title": "Cybersecurity for Everyone — Full Intro",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=9_E3RKPKQJQ",
           "duration": "12 min",
@@ -349,7 +349,7 @@
         },
         {
           "order": 2,
-          "title": "Build a Website with No Code \u2014 Full Tutorial",
+          "title": "Build a Website with No Code — Full Tutorial",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=v7dD2G7V_yg",
           "duration": "22 min",
@@ -358,7 +358,7 @@
         },
         {
           "order": 3,
-          "title": "Bubble.io Full Tutorial \u2014 Build Real Apps",
+          "title": "Bubble.io Full Tutorial — Build Real Apps",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=MzSLJ_-wzWo",
           "duration": "30 min",
@@ -367,7 +367,7 @@
         },
         {
           "order": 4,
-          "title": "Automate with Make.com \u2014 Beginner Tutorial",
+          "title": "Automate with Make.com — Beginner Tutorial",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=b7AvSqZoNwA",
           "duration": "20 min",
@@ -400,7 +400,7 @@
           "url": "https://www.youtube.com/watch?v=F8NKVhkZZWI",
           "duration": "10 min",
           "source": "IBM Technology",
-          "note": "Full product build from scratch \u2014 payments and AI included."
+          "note": "Full product build from scratch — payments and AI included."
         }
       ]
     },
@@ -433,7 +433,7 @@
       "steps": [
         {
           "order": 1,
-          "title": "How to Become a Data Analyst \u2014 Roadmap",
+          "title": "How to Become a Data Analyst — Roadmap",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=yZvFH7B6gKI",
           "duration": "15 min",
@@ -442,12 +442,12 @@
         },
         {
           "order": 2,
-          "title": "Excel for Data Analysis \u2014 Full Tutorial",
+          "title": "Excel for Data Analysis — Full Tutorial",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=Vl0H-qTclOg",
           "duration": "30 min",
           "source": "Traversy Media",
-          "note": "The tool you already have \u2014 master it first."
+          "note": "The tool you already have — master it first."
         },
         {
           "order": 3,
@@ -465,11 +465,11 @@
           "url": "https://www.youtube.com/watch?v=qBigTkBLU6g",
           "duration": "15 min",
           "source": "StatQuest",
-          "note": "Mean, median, variance \u2014 explained the StatQuest way."
+          "note": "Mean, median, variance — explained the StatQuest way."
         },
         {
           "order": 5,
-          "title": "Python for Data Science \u2014 Crash Course",
+          "title": "Python for Data Science — Crash Course",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=LHBE6Q9XlzI",
           "duration": "12 min",
@@ -480,7 +480,7 @@
           "order": 6,
           "title": "Start Your First Data Project",
           "type": "article",
-          "url": "https://www.kaggle.com/learn/intro-to-programming",
+          "url": "https://www.kaggle.com/learn",
           "duration": "15 min read",
           "source": "Kaggle Learn",
           "note": "Build something for your portfolio today. Free & interactive."
@@ -502,7 +502,7 @@
           "url": "https://www.youtube.com/watch?v=vmEHCJofslg",
           "duration": "1 hr",
           "source": "Luke Barousse",
-          "note": "The core Python data library \u2014 master this."
+          "note": "The core Python data library — master this."
         }
       ]
     },
@@ -521,7 +521,7 @@
           "url": "https://www.youtube.com/watch?v=Gv9_4yMHFhI",
           "duration": "25 min",
           "source": "StatQuest",
-          "note": "Scikit-learn, models, train/test splits \u2014 all clearly."
+          "note": "Scikit-learn, models, train/test splits — all clearly."
         }
       ]
     },
@@ -544,7 +544,7 @@
         },
         {
           "order": 2,
-          "title": "AWS vs Azure vs GCP \u2014 Explained",
+          "title": "AWS vs Azure vs GCP — Explained",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=M988_fsOSWo",
           "duration": "10 min",
@@ -613,7 +613,7 @@
           "url": "https://www.youtube.com/watch?v=SLB_c_ayRMo",
           "duration": "1 hr",
           "source": "TechWorld with Nana",
-          "note": "Infrastructure as code \u2014 the most in-demand DevOps skill."
+          "note": "Infrastructure as code — the most in-demand DevOps skill."
         }
       ]
     },
@@ -627,7 +627,7 @@
       "steps": [
         {
           "order": 1,
-          "title": "Microservices Architecture \u2014 Full Course",
+          "title": "Microservices Architecture — Full Course",
           "type": "video",
           "url": "https://www.youtube.com/watch?v=lL_j7ilk7rc",
           "duration": "45 min",
