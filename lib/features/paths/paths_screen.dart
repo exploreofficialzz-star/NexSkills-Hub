@@ -9,8 +9,6 @@ import '../../shared/widgets/shared_widgets.dart';
 import 'path_detail_screen.dart';
 
 /// Section key for path-card tap counter — persisted in Hive.
-const _kPathCardSection = 'path_cards';
-
 class PathsScreen extends StatefulWidget {
   const PathsScreen({super.key});
 
@@ -56,8 +54,7 @@ class _PathsScreenState extends State<PathsScreen>
   /// Tap 1 → ad; Tap 2 → skip; Tap 3 → ad; etc.
   /// Counter is persisted in Hive across restarts via AdManager.
   void _openPath(LearningPath path) {
-    AdManager.instance.showInterstitialForSection(
-      _kPathCardSection,
+    AdManager.instance.showInterstitial(
       onDismissed: () {
         if (!mounted) return;
         Navigator.push(
