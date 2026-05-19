@@ -46,10 +46,11 @@ class HiveService {
   static Future<void> saveResources(List<ResourceModel> items) async {
     final seenBox = Hive.box<String>(_seenIdsBox);
     for (final item in items) {
-      if (!seenBox.containsKey(item.id)) {
-        await _resources.put(item.id, item);
-        await seenBox.put(item.id, item.id);
-      }
+      // Always overwrite — ensures type, thumbnail (clearbit logos), and all
+      // other fields stay current on every fetch. seenIds is still written for
+      // notification-new-count tracking but no longer gates the resource update.
+      await _resources.put(item.id, item);
+      await seenBox.put(item.id, item.id);
     }
   }
 
