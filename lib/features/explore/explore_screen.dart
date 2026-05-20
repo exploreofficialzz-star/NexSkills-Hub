@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/resource_model.dart';
 import '../../core/services/hive_service.dart';
 import '../../core/services/rss_service.dart';
 import '../../core/services/ad_manager.dart';
-import '../../core/services/connectivity_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import 'video_player_screen.dart';
 import 'resource_viewer_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
-
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
@@ -54,7 +54,8 @@ class _ExploreScreenState extends State<ExploreScreen>
     _consumedIds = HiveService.getAllConsumedIds();
     _loadFromCache();
     _fetchFresh();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBottomBanner());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _loadBottomBanner());
   }
 
   @override
@@ -73,14 +74,20 @@ class _ExploreScreenState extends State<ExploreScreen>
   void _loadFromCache() {
     const allCats = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
     final raw = _selectedCategory == 'all'
-        ? allCats.expand((cat) => HiveService.getResourcesByCategory(cat)).toList()
+        ? allCats.expand((c) => HiveService.getResourcesByCategory(c)).toList()
         : HiveService.getResourcesByCategory(_selectedCategory);
-    if (mounted) {
-      setState(() {
-        _items = raw;
-        if (raw.isNotEmpty) _loading = false;
-      });
-    }
+    if (mounted) setState(() {
+      _items = _sortWithConsumedAtBottom(raw);
+      if (raw.isNotEmpty) _loading = false;
+    });
+  }
+
+  List<ResourceModel> _sortWithConsumedAtBottom(List<ResourceModel> src) {
+    final unconsumed = src.where((r) => !_consumedIds.contains(r.id)).toList()
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    final consumed = src.where((r) => _consumedIds.contains(r.id)).toList()
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    return [...unconsumed, ...consumed];
   }
 
   Future<void> _fetchFresh() async {
@@ -90,90 +97,53 @@ class _ExploreScreenState extends State<ExploreScreen>
       _consumedIds = HiveService.getAllConsumedIds();
       _loadFromCache();
     } catch (e) {
-      if (mounted) setState(() => _error = 'Could not fetch content. Check your connection.');
+      if (mounted) setState(() => _error = 'Could not fetch. Check your connection.');
     } finally {
       if (mounted) setState(() { _refreshing = false; _loading = false; });
     }
   }
 
+  // Robust video detection — checks stored type AND URL pattern
   bool _isVideo(ResourceModel r) => r.type == 'video' || r.isYoutube;
 
-  // ─── Build the display list for the current filters ───────────────────────
-  List<ResourceModel> get _displayList {
-    // 1. Apply category filter
-    var list = _selectedCategory == 'all'
-        ? _items
-        : _items.where((r) => r.category == _selectedCategory).toList();
-
-    // 2. Apply type filter
+  List<ResourceModel> get _filtered {
+    var list = _items;
+    if (_selectedCategory != 'all') {
+      list = list.where((r) => r.category == _selectedCategory).toList();
+    }
     if (_selectedType == 'video') {
-      list = list.where(_isVideo).toList()
-        ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-      return _consumedLast(list);
+      list = list.where(_isVideo).toList();
+    } else if (_selectedType == 'article') {
+      list = list.where((r) => !_isVideo(r)).toList();
     }
-    if (_selectedType == 'article') {
-      list = list.where((r) => !_isVideo(r)).toList()
-        ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-      return _consumedLast(list);
-    }
-
-    // 3. "All" — interleave videos and articles so both types are visible
-    //    immediately without needing to scroll past a wall of one type.
-    return _consumedLast(_interleave(list));
+    return list;
   }
 
-  /// Interleave: 1 video → 2 articles → 1 video → 2 articles → …
-  List<ResourceModel> _interleave(List<ResourceModel> items) {
-    final videos = items.where(_isVideo).toList()
-      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    final articles = items.where((r) => !_isVideo(r)).toList()
-      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-
-    if (videos.isEmpty) return articles;
-    if (articles.isEmpty) return videos;
-
-    final result = <ResourceModel>[];
-    int vi = 0, ai = 0;
-    while (vi < videos.length || ai < articles.length) {
-      if (vi < videos.length) result.add(videos[vi++]);
-      if (ai < articles.length) result.add(articles[ai++]);
-      if (ai < articles.length) result.add(articles[ai++]);
-    }
-    return result;
-  }
-
-  /// Move consumed items to the bottom, preserving their relative order.
-  List<ResourceModel> _consumedLast(List<ResourceModel> items) {
-    final fresh = items.where((r) => !_consumedIds.contains(r.id)).toList();
-    final done  = items.where((r) =>  _consumedIds.contains(r.id)).toList();
-    return [...fresh, ...done];
-  }
-
-  // ─── Open a resource ──────────────────────────────────────────────────────
-  /// Videos and articles both open in ResourceViewerScreen.
-  /// ResourceViewerScreen uses youtube_player_flutter for videos and
-  /// flutter_inappwebview for articles — no external YouTube app needed.
-  void _openResource(ResourceModel resource) {
-    AdManager.instance.showInterstitial(
-      onDismissed: () => _navigateTo(resource),
+  void _openResource(ResourceModel r) {
+    // Aggressive: interstitial every 2-3 content clicks
+    AdManager.instance.showInterstitialOnContentClick(
+      onDismissed: () {
+        if (!mounted) return;
+        if (_isVideo(r)) {
+          // In-app YouTube player — no redirect
+          Navigator.push(context,
+              MaterialPageRoute(builder: (_) => VideoPlayerScreen(resource: r)));
+          _markConsumed(r);
+        } else {
+          Navigator.push(context,
+              MaterialPageRoute(builder: (_) => ResourceViewerScreen(resource: r)))
+          .then((_) => _markConsumed(r));
+        }
+      },
     );
   }
 
-  void _navigateTo(ResourceModel resource) {
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ResourceViewerScreen(resource: resource)),
-    ).then((_) {
-      // Mark as consumed only after the user returns from the viewer
-      HiveService.markConsumed(resource.id);
-      HiveService.markRead(resource.id);
-      if (mounted) {
-        setState(() {
-          _consumedIds = HiveService.getAllConsumedIds();
-          _loadFromCache();
-        });
-      }
+  void _markConsumed(ResourceModel r) {
+    HiveService.markConsumed(r.id);
+    HiveService.markRead(r.id);
+    if (mounted) setState(() {
+      _consumedIds = HiveService.getAllConsumedIds();
+      _items = _sortWithConsumedAtBottom(_items);
     });
   }
 
@@ -183,20 +153,20 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Future<void> _clearHistory() async {
-    final confirm = await showDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Clear history?'),
-        content: const Text('Resets your watched/read list so all content appears fresh.'),
+        content: const Text('Resets your watched/read list.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Clear')),
         ],
       ),
     );
-    if (confirm == true) {
+    if (ok == true) {
       await HiveService.clearConsumedItems();
-      if (mounted) setState(() { _consumedIds = {}; });
+      if (mounted) setState(() { _consumedIds = {}; _items = _sortWithConsumedAtBottom(_items); });
     }
   }
 
@@ -226,7 +196,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                       ),
               ),
               if (_bottomBannerLoaded && _bottomBanner != null)
-                _StickyBottomBanner(ad: _bottomBanner!, c: c),
+                _StickyBanner(ad: _bottomBanner!, c: c),
             ],
           ),
         ),
@@ -234,153 +204,118 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  Widget _buildHeader(NexColors c) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Explore',
-                    style: TextStyle(color: c.textPrimary, fontSize: 28,
-                        fontWeight: FontWeight.w800, letterSpacing: -0.8)),
-                Text('Fresh content from top sources',
-                    style: TextStyle(color: c.textMuted, fontSize: 13)),
-              ],
+  Widget _buildHeader(NexColors c) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+    child: Row(children: [
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Explore', style: TextStyle(color: c.textPrimary, fontSize: 28,
+            fontWeight: FontWeight.w800, letterSpacing: -0.8)),
+        Text('Fresh content from top sources',
+            style: TextStyle(color: c.textMuted, fontSize: 13)),
+      ])),
+      GestureDetector(onTap: _clearHistory,
+          child: Padding(padding: const EdgeInsets.only(right: 12),
+              child: Icon(Icons.history_toggle_off, color: c.textMuted, size: 22))),
+      _refreshing
+          ? SizedBox(width: 20, height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: NexColors.primary))
+          : GestureDetector(onTap: _fetchFresh,
+              child: Icon(Icons.refresh, color: c.textMuted)),
+    ]),
+  );
+
+  Widget _buildErrorBar(NexColors c) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+    child: Row(children: [
+      const Icon(Icons.wifi_off, color: NexColors.error, size: 14),
+      const SizedBox(width: 8),
+      Expanded(child: Text(_error!, style: const TextStyle(color: NexColors.error, fontSize: 12))),
+      GestureDetector(onTap: _fetchFresh,
+          child: const Text('Retry', style: TextStyle(
+              color: NexColors.primary, fontSize: 12, fontWeight: FontWeight.w700))),
+    ]),
+  );
+
+  Widget _buildCategoryFilter(NexColors c) => SizedBox(
+    height: 40,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: _categories.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      itemBuilder: (_, i) {
+        final cat = _categories[i];
+        final sel = _selectedCategory == cat.$1;
+        return GestureDetector(
+          onTap: () => setState(() => _selectedCategory = cat.$1),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: sel ? NexColors.primary : c.card,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: sel ? NexColors.primary : c.border, width: 0.5),
             ),
+            child: Text('${cat.$2} ${cat.$3}',
+                style: TextStyle(color: sel ? Colors.white : c.textMuted,
+                    fontSize: 13, fontWeight: FontWeight.w600)),
           ),
-          GestureDetector(
-            onTap: _clearHistory,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Icon(Icons.history_toggle_off, color: c.textMuted, size: 22),
+        );
+      },
+    ),
+  );
+
+  Widget _buildTypeFilter(NexColors c) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+    child: Row(children: _types.map((t) {
+      final sel = _selectedType == t.$1;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: GestureDetector(
+          onTap: () => setState(() => _selectedType = t.$1),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: sel ? NexColors.accent.withOpacity(0.12) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: sel ? NexColors.accent : c.textMuted.withOpacity(0.3)),
             ),
+            child: Text(t.$2, style: TextStyle(
+                color: sel ? NexColors.accent : c.textMuted,
+                fontSize: 12, fontWeight: FontWeight.w600)),
           ),
-          _refreshing
-              ? SizedBox(width: 20, height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: NexColors.primary))
-              : GestureDetector(onTap: _fetchFresh,
-                  child: Icon(Icons.refresh, color: c.textMuted)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorBar(NexColors c) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      child: Row(
-        children: [
-          const Icon(Icons.wifi_off, color: NexColors.error, size: 14),
-          const SizedBox(width: 8),
-          Expanded(child: Text(_error!, style: const TextStyle(color: NexColors.error, fontSize: 12))),
-          GestureDetector(onTap: _fetchFresh,
-              child: const Text('Retry',
-                  style: TextStyle(color: NexColors.primary, fontSize: 12,
-                      fontWeight: FontWeight.w700))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryFilter(NexColors c) {
-    return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final cat = _categories[i];
-          final selected = _selectedCategory == cat.$1;
-          return GestureDetector(
-            onTap: () => setState(() => _selectedCategory = cat.$1),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: selected ? NexColors.primary : c.card,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: selected ? NexColors.primary : c.border, width: 0.5),
-              ),
-              child: Text('${cat.$2} ${cat.$3}',
-                  style: TextStyle(
-                      color: selected ? Colors.white : c.textMuted,
-                      fontSize: 13, fontWeight: FontWeight.w600)),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildTypeFilter(NexColors c) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
-      child: Row(
-        children: _types.map((t) {
-          final selected = _selectedType == t.$1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedType = t.$1),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: selected ? NexColors.accent.withOpacity(0.12) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: selected ? NexColors.accent : c.textMuted.withOpacity(0.3)),
-                ),
-                child: Text(t.$2,
-                    style: TextStyle(
-                        color: selected ? NexColors.accent : c.textMuted,
-                        fontSize: 12, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+        ),
+      );
+    }).toList()),
+  );
 
   Widget _buildList(NexColors c) {
-    final items = _displayList;
+    final items = _filtered;
     if (items.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.22),
-          Center(
-            child: Column(
-              children: [
-                const Text('📡', style: TextStyle(fontSize: 52)),
-                const SizedBox(height: 16),
-                Text('No content yet',
-                    style: TextStyle(color: c.textPrimary, fontSize: 18,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                Text('Pull down to fetch latest content',
-                    style: TextStyle(color: c.textMuted, fontSize: 13)),
-              ],
-            ),
-          ),
-        ],
-      );
+      return ListView(physics: const AlwaysScrollableScrollPhysics(), children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.22),
+        Center(child: Column(children: [
+          const Text('📡', style: TextStyle(fontSize: 52)),
+          const SizedBox(height: 16),
+          Text('No content yet', style: TextStyle(color: c.textPrimary,
+              fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text('Pull down to fetch latest content',
+              style: TextStyle(color: c.textMuted, fontSize: 13)),
+        ])),
+      ]);
     }
 
     final isPremium = HiveService.getProgress().isPremium;
+
+    // Interleave: native ad every 3 content items (aggressive)
     final withAds = <dynamic>[];
     int count = 0;
     for (final item in items) {
       withAds.add(item);
       count++;
-      if (!isPremium && count % 5 == 0) withAds.add('native_ad');
+      if (!isPremium && count % 3 == 0) withAds.add('native_ad');
     }
 
     return ListView.builder(
@@ -388,28 +323,25 @@ class _ExploreScreenState extends State<ExploreScreen>
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       itemCount: withAds.length,
       itemBuilder: (_, i) {
-        final item = withAds[i];
-        if (item == 'native_ad') return _NativeAdSlot(c: c);
-
-        final resource = item as ResourceModel;
-        final isConsumed = _consumedIds.contains(resource.id);
-        final isVid = _isVideo(resource);
-
+        if (withAds[i] == 'native_ad') return _NativeAdSlot(c: c);
+        final r = withAds[i] as ResourceModel;
+        final isConsumed = _consumedIds.contains(r.id);
         return GestureDetector(
           onLongPress: isConsumed ? () async {
             await HiveService.clearConsumedItems();
-            if (mounted) {
-              setState(() { _consumedIds = {}; });
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('History cleared')));
-            }
+            if (mounted) setState(() {
+              _consumedIds = {};
+              _items = _sortWithConsumedAtBottom(_items);
+            });
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('History cleared')));
           } : null,
-          child: _ResourceCard(
-            resource: resource,
+          child: _ContentCard(
+            resource: r,
+            isVideo: _isVideo(r),
             isConsumed: isConsumed,
-            isVideo: isVid,
-            onTap: () => _openResource(resource),
-            onBookmark: () => _toggleBookmark(resource),
+            onTap: () => _openResource(r),
+            onBookmark: () => _toggleBookmark(r),
           ),
         );
       },
@@ -417,18 +349,18 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 }
 
-// ─── Resource Card ────────────────────────────────────────────────────────────
-class _ResourceCard extends StatelessWidget {
+// ─── Content Card ─────────────────────────────────────────────────────────────
+class _ContentCard extends StatelessWidget {
   final ResourceModel resource;
-  final bool isConsumed;
   final bool isVideo;
+  final bool isConsumed;
   final VoidCallback onTap;
   final VoidCallback onBookmark;
 
-  const _ResourceCard({
+  const _ContentCard({
     required this.resource,
-    required this.isConsumed,
     required this.isVideo,
+    required this.isConsumed,
     required this.onTap,
     required this.onBookmark,
   });
@@ -439,7 +371,7 @@ class _ResourceCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Opacity(
-        opacity: isConsumed ? 0.65 : 1.0,
+        opacity: isConsumed ? 0.62 : 1.0,
         child: Container(
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
@@ -450,30 +382,30 @@ class _ResourceCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Thumbnail(resource: resource, isVideo: isVideo, c: c),
+              // ── Thumbnail (always shown — shimmer while loading) ──
+              _Thumbnail(resource: resource, isVideo: isVideo),
+              // ── Text body ───────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        _TypeBadge(isVideo: isVideo),
-                        if (isConsumed) ...[
-                          const SizedBox(width: 8),
-                          _ConsumedChip(isVideo: isVideo),
-                        ],
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: onBookmark,
-                          child: Icon(
-                            resource.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                            color: resource.isBookmarked ? NexColors.primary : c.textMuted,
-                            size: 20,
-                          ),
-                        ),
+                    Row(children: [
+                      _TypeBadge(isVideo: isVideo),
+                      if (isConsumed) ...[
+                        const SizedBox(width: 8),
+                        _ConsumedChip(isVideo: isVideo),
                       ],
-                    ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: onBookmark,
+                        child: Icon(
+                          resource.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                          color: resource.isBookmarked ? NexColors.primary : c.textMuted,
+                          size: 20,
+                        ),
+                      ),
+                    ]),
                     const SizedBox(height: 8),
                     Text(resource.title,
                         style: TextStyle(color: c.textPrimary, fontSize: 15,
@@ -481,12 +413,12 @@ class _ResourceCard extends StatelessWidget {
                         maxLines: 3, overflow: TextOverflow.ellipsis),
                     if (resource.description != null &&
                         resource.description!.isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Text(resource.description!,
                           style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
                           maxLines: 2, overflow: TextOverflow.ellipsis),
                     ],
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Text(resource.sourceName,
                         style: TextStyle(color: c.textMuted, fontSize: 12,
                             fontWeight: FontWeight.w500)),
@@ -505,103 +437,159 @@ class _ResourceCard extends StatelessWidget {
 class _Thumbnail extends StatelessWidget {
   final ResourceModel resource;
   final bool isVideo;
-  final NexColors c;
-  const _Thumbnail({required this.resource, required this.isVideo, required this.c});
+  const _Thumbnail({required this.resource, required this.isVideo});
 
   static const _catColors = {
-    'ai': Color(0xFF6C63FF), 'cybersecurity': Color(0xFF00C853),
-    'nocode': Color(0xFFFF6D00), 'data': Color(0xFF0091EA), 'cloud': Color(0xFF00B8D4),
-  };
-  static const _catIcons = {
-    'ai': '🤖', 'cybersecurity': '🔐', 'nocode': '⚡', 'data': '📊', 'cloud': '☁️',
+    'ai':            Color(0xFF6C63FF),
+    'cybersecurity': Color(0xFF00C853),
+    'nocode':        Color(0xFFFF6D00),
+    'data':          Color(0xFF0091EA),
+    'cloud':         Color(0xFF00B8D4),
   };
 
-  bool get _isClearbit =>
-      resource.thumbnail != null && resource.thumbnail!.contains('logo.clearbit.com');
+  static const _catIcons = {
+    'ai': '🤖', 'cybersecurity': '🔐', 'nocode': '⚡',
+    'data': '📊', 'cloud': '☁️',
+  };
 
   @override
   Widget build(BuildContext context) {
     final thumb = resource.thumbnail;
+    const h = 190.0;
+    final radius = const BorderRadius.vertical(top: Radius.circular(16));
+    final isClearbit = thumb != null && thumb.contains('logo.clearbit.com');
 
-    if (thumb == null) return _gradient();
-
-    if (_isClearbit) {
-      // Clearbit logos: small square logo centred on a subtle background
-      return ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        child: Container(
-          width: double.infinity, height: 80, color: c.surface,
-          padding: const EdgeInsets.all(14),
-          child: CachedNetworkImage(
-            imageUrl: thumb, fit: BoxFit.contain,
-            errorWidget: (_, __, ___) => _gradient(),
-          ),
-        ),
-      );
+    // No thumbnail at all → gradient placeholder
+    if (thumb == null) {
+      return _GradientPlaceholder(
+          category: resource.category, sourceName: resource.sourceName,
+          isVideo: isVideo, height: h, radius: radius);
     }
 
-    // Full image (YouTube hqdefault or embedded article image)
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          child: CachedNetworkImage(
-            imageUrl: thumb,
-            memCacheWidth: 600, memCacheHeight: 340,
-            width: double.infinity, height: 190, fit: BoxFit.cover,
-            errorWidget: (_, __, ___) => _gradient(),
-          ),
+    return ClipRRect(
+      borderRadius: radius,
+      child: Stack(children: [
+        // Image with shimmer placeholder
+        CachedNetworkImage(
+          imageUrl: thumb,
+          width: double.infinity,
+          height: isClearbit ? 100 : h,
+          fit: isClearbit ? BoxFit.contain : BoxFit.cover,
+          memCacheWidth: 640,
+          memCacheHeight: 360,
+          // ── Shimmer while loading ─────────────────────────────
+          placeholder: (_, __) => _ShimmerBox(
+              width: double.infinity, height: isClearbit ? 100 : h),
+          // ── Gradient bg for clearbit logos ───────────────────
+          imageBuilder: isClearbit
+              ? (_, img) => Container(
+                    width: double.infinity,
+                    height: 100,
+                    color: _catColors[resource.category]?.withOpacity(0.12)
+                        ?? Colors.grey.withOpacity(0.1),
+                    padding: const EdgeInsets.all(16),
+                    child: Image(image: img, fit: BoxFit.contain),
+                  )
+              : null,
+          errorWidget: (_, __, ___) => _GradientPlaceholder(
+              category: resource.category, sourceName: resource.sourceName,
+              isVideo: isVideo, height: h, radius: BorderRadius.zero),
         ),
-        if (isVideo)
+        // Play button overlay on YouTube thumbnails
+        if (isVideo && !isClearbit)
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                color: Colors.black.withOpacity(0.32),
+                gradient: LinearGradient(
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.45)],
+                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                ),
               ),
               child: const Center(
                 child: Icon(Icons.play_circle_filled, color: Colors.white, size: 58),
               ),
             ),
           ),
-      ],
+      ]),
     );
   }
+}
 
-  Widget _gradient() {
-    final base = _catColors[resource.category] ?? const Color(0xFF6C63FF);
-    final icon = _catIcons[resource.category] ?? '📄';
-    return Container(
-      width: double.infinity, height: isVideo ? 190 : 80,
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        gradient: LinearGradient(
-          colors: [base.withOpacity(0.55), base.withOpacity(0.15)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+// ─── Shimmer box ──────────────────────────────────────────────────────────────
+class _ShimmerBox extends StatelessWidget {
+  final double width, height;
+  const _ShimmerBox({required this.width, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    return Shimmer.fromColors(
+      baseColor:      isDark ? const Color(0xFF1E1E2E) : const Color(0xFFE0E0E0),
+      highlightColor: isDark ? const Color(0xFF2A2A3E) : const Color(0xFFF5F5F5),
+      child: Container(
+        width: width,
+        height: height,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(icon, style: TextStyle(fontSize: isVideo ? 42 : 28)),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(resource.sourceName,
-                style: TextStyle(color: Colors.white.withOpacity(0.85),
-                    fontSize: isVideo ? 16 : 13, fontWeight: FontWeight.w600),
-                overflow: TextOverflow.ellipsis),
-          ),
-          if (isVideo) ...[
-            const SizedBox(width: 16),
-            const Icon(Icons.play_circle_outline, color: Colors.white70, size: 40),
-          ],
-        ],
       ),
     );
   }
 }
 
-// ─── Small widgets ────────────────────────────────────────────────────────────
+// ─── Gradient Placeholder ─────────────────────────────────────────────────────
+class _GradientPlaceholder extends StatelessWidget {
+  final String category, sourceName;
+  final bool isVideo;
+  final double height;
+  final BorderRadius radius;
+
+  const _GradientPlaceholder({
+    required this.category, required this.sourceName,
+    required this.isVideo, required this.height, required this.radius,
+  });
+
+  static const _colors = {
+    'ai': Color(0xFF6C63FF), 'cybersecurity': Color(0xFF00C853),
+    'nocode': Color(0xFFFF6D00), 'data': Color(0xFF0091EA), 'cloud': Color(0xFF00B8D4),
+  };
+  static const _icons = {
+    'ai': '🤖', 'cybersecurity': '🔐', 'nocode': '⚡', 'data': '📊', 'cloud': '☁️',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final base = _colors[category] ?? const Color(0xFF6C63FF);
+    final icon = _icons[category] ?? '📄';
+    return ClipRRect(
+      borderRadius: radius,
+      child: Container(
+        width: double.infinity, height: height,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [base.withOpacity(0.6), base.withOpacity(0.15)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight,
+          ),
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(icon, style: const TextStyle(fontSize: 36)),
+          const SizedBox(width: 14),
+          Flexible(child: Text(sourceName,
+              style: const TextStyle(color: Colors.white70, fontSize: 14,
+                  fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis)),
+          if (isVideo) ...[
+            const SizedBox(width: 14),
+            const Icon(Icons.play_circle_outline, color: Colors.white60, size: 36),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── Type badge ───────────────────────────────────────────────────────────────
 class _TypeBadge extends StatelessWidget {
   final bool isVideo;
   const _TypeBadge({required this.isVideo});
@@ -613,7 +601,7 @@ class _TypeBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3), width: 0.5),
+        border: Border.all(color: color.withOpacity(0.35), width: 0.5),
       ),
       child: Text(isVideo ? '🎬 Video' : '📄 Article',
           style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
@@ -621,23 +609,23 @@ class _TypeBadge extends StatelessWidget {
   }
 }
 
+// ─── Consumed chip ────────────────────────────────────────────────────────────
 class _ConsumedChip extends StatelessWidget {
   final bool isVideo;
   const _ConsumedChip({required this.isVideo});
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: NexColors.success.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-      child: Text(isVideo ? '✓ Watched' : '✓ Read',
-          style: const TextStyle(color: NexColors.success, fontSize: 10,
-              fontWeight: FontWeight.w600)),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+        color: NexColors.success.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6)),
+    child: Text(isVideo ? '✓ Watched' : '✓ Read',
+        style: const TextStyle(color: NexColors.success, fontSize: 10,
+            fontWeight: FontWeight.w600)),
+  );
 }
 
-// ─── Native Ad Slot ───────────────────────────────────────────────────────────
+// ─── Native ad slot (every 3 items) ──────────────────────────────────────────
 class _NativeAdSlot extends StatefulWidget {
   final NexColors c;
   const _NativeAdSlot({required this.c});
@@ -664,8 +652,10 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
         mainBackgroundColor: widget.c.card,
         cornerRadius: 12,
         callToActionTextStyle: NativeTemplateTextStyle(
-          textColor: Colors.white, backgroundColor: NexColors.primary,
-          style: NativeTemplateFontStyle.bold, size: 14,
+          textColor: Colors.white,
+          backgroundColor: NexColors.primary,
+          style: NativeTemplateFontStyle.bold,
+          size: 14,
         ),
         primaryTextStyle: NativeTemplateTextStyle(
           textColor: widget.c.textPrimary,
@@ -676,8 +666,7 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
           style: NativeTemplateFontStyle.normal, size: 12,
         ),
       ),
-    );
-    _ad!.load();
+    )..load();
   }
 
   @override
@@ -690,7 +679,8 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
       margin: const EdgeInsets.only(bottom: 14),
       height: 80,
       decoration: BoxDecoration(
-        color: c.card, borderRadius: BorderRadius.circular(12),
+        color: c.card,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: c.border, width: 0.5),
       ),
       child: _loaded && _ad != null
@@ -701,33 +691,26 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
   }
 }
 
-// ─── Sticky Bottom Banner ─────────────────────────────────────────────────────
-class _StickyBottomBanner extends StatelessWidget {
+// ─── Sticky bottom banner ─────────────────────────────────────────────────────
+class _StickyBanner extends StatelessWidget {
   final BannerAd ad;
   final NexColors c;
-  const _StickyBottomBanner({required this.ad, required this.c});
-
+  const _StickyBanner({required this.ad, required this.c});
   @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: Container(
-        color: c.surface,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(height: 0.5, color: c.border),
-            Padding(padding: const EdgeInsets.only(top: 4),
-                child: Text('Advertisement',
-                    style: TextStyle(color: c.textMuted, fontSize: 9, letterSpacing: 0.5))),
-            SizedBox(
-              width: ad.size.width.toDouble(),
-              height: ad.size.height.toDouble(),
-              child: AdWidget(ad: ad),
-            ),
-            const SizedBox(height: 4),
-          ],
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: Container(
+      color: c.surface,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(height: 0.5, color: c.border),
+        Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Text('Advertisement',
+              style: TextStyle(color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
         ),
-      ),
-    );
-  }
+        SizedBox(width: ad.size.width.toDouble(), height: ad.size.height.toDouble(),
+            child: AdWidget(ad: ad)),
+        const SizedBox(height: 4),
+      ]),
+    ),
+  );
 }

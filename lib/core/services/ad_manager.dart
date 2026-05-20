@@ -1,30 +1,29 @@
-import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'hive_service.dart';
 
-/// AdManager — centralized ad orchestration singleton.
+/// AdManager — aggressive ad orchestration.
 ///
-/// Strategy (aggressive, per product spec):
-///   • Interstitial attempted on EVERY lesson tap and EVERY content click.
-///   • 60-second global cooldown (AdMob policy minimum) prevents back-to-back ads.
-///   • Auto-reload immediately after each ad is dismissed.
-///   • Premium users: zero ads, all paths bypass immediately.
-///   • App-open ads: NOT included per product decision.
-///   • Tab-switch ads: NOT included per product decision.
+/// Ad formats:
+///   ✓ Banner        — sticky footer + inline Today/Explore
+///   ✓ Interstitial  — every 2-3 content clicks / lesson taps
+///   ✓ Rewarded      — locked lesson unlock (opt-in)
+///   ✓ Rewarded Int  — XP boost (opt-in)
+///   ✓ Native        — every 3 items in Explore list
+///   ✗ App-open      — excluded per product decision
+///   ✗ Tab-switch    — excluded per product decision
 ///
-/// Ad formats included:
-///   ✓ Banner (sticky footer + inline)
-///   ✓ Interstitial (lessons + content clicks)
-///   ✓ Rewarded (locked lesson unlock)
-///   ✓ Rewarded Interstitial (XP boost, opt-in)
-///   ✗ App-open (excluded per product decision)
+/// Interstitial strategy:
+///   Two independent counters (content & lessons) each using a
+///   randomised 2-3 threshold:  clicks 2→ad, 3→ad, 2→ad, 3→ad …
+///   The 60-second cooldown ensures AdMob policy compliance.
 class AdManager {
   AdManager._();
   static final AdManager instance = AdManager._();
+  final _rng = Random();
 
-  // ── Test IDs (Google official) ─────────────────────────────────
+  // ── Test IDs ───────────────────────────────────────────────────
   static const _testInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
   static const _testRewardedId     = 'ca-app-pub-3940256099942544/5224354917';
   static const _testBannerId       = 'ca-app-pub-3940256099942544/6300978111';
@@ -53,16 +52,25 @@ class AdManager {
   bool _rewardedLoading     = false;
   bool _rewardedIntLoading  = false;
 
-  // 60-second global interstitial cooldown (AdMob policy minimum)
-  DateTime? _lastInterstitialShownAt;
+  // ── 60-second global cooldown ──────────────────────────────────
+  DateTime? _lastShownAt;
   static const _cooldownSeconds = 60;
+
+  // ── Content click counter (Explore) ───────────────────────────
+  // Threshold alternates 2 → 3 → 2 → 3 …
+  int _contentClicks  = 0;
+  int _contentThresh  = 2; // first ad after 2nd click
+
+  // ── Lesson tap counter (My Path) ──────────────────────────────
+  int _lessonTaps    = 0;
+  int _lessonThresh  = 2; // first ad after 2nd lesson tap
 
   bool get isInterstitialReady => _interstitial != null;
   bool get isRewardedReady     => _rewarded != null;
 
   static const _request = AdRequest();
 
-  // ── Init — called from HomeScreen postFrameCallback only ───────
+  // ── Init — postFrameCallback only ─────────────────────────────
   Future<void> init() async {
     loadInterstitial();
     loadRewarded();
@@ -70,7 +78,7 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // INTERSTITIAL
+  // INTERSTITIAL — core show logic
   // ─────────────────────────────────────────────────────────────
   Future<void> loadInterstitial() async {
     if (_interstitialLoading || _interstitial != null) return;
@@ -89,42 +97,26 @@ class AdManager {
     );
   }
 
-  /// Attempt to show an interstitial.
-  ///
-  /// [onDismissed] is ALWAYS called — navigation is never blocked.
-  /// Returns true if an ad was actually displayed.
-  ///
-  /// Aggressive: call this on every lesson tap and every content click.
-  /// The 60-second cooldown prevents back-to-back ads while keeping
-  /// the experience monetised at the maximum allowable frequency.
+  bool _isCoolingDown() {
+    if (_lastShownAt == null) return false;
+    return DateTime.now().difference(_lastShownAt!).inSeconds < _cooldownSeconds;
+  }
+
+  /// Raw show — used internally. [onDismissed] always fires.
   Future<bool> showInterstitial({VoidCallback? onDismissed}) async {
-    final progress = HiveService.getProgress();
-    if (progress.isPremium) {
-      onDismissed?.call();
-      return false;
-    }
-
-    // 60-second global cooldown
-    if (_lastInterstitialShownAt != null) {
-      final elapsed = DateTime.now().difference(_lastInterstitialShownAt!).inSeconds;
-      if (elapsed < _cooldownSeconds) {
-        onDismissed?.call();
-        return false;
-      }
-    }
-
+    if (HiveService.getProgress().isPremium) { onDismissed?.call(); return false; }
+    if (_isCoolingDown())                    { onDismissed?.call(); return false; }
     if (_interstitial == null) {
-      loadInterstitial(); // start preloading for next time
+      loadInterstitial();
       onDismissed?.call();
       return false;
     }
-
     _interstitial!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         _interstitial = null;
-        _lastInterstitialShownAt = DateTime.now();
-        loadInterstitial(); // reload immediately after dismiss
+        _lastShownAt = DateTime.now();
+        loadInterstitial();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
@@ -138,9 +130,7 @@ class AdManager {
     return true;
   }
 
-  /// Show interstitial with a timeout fallback.
-  /// If the ad is not ready within [timeout], [onDismissed] fires
-  /// immediately so navigation is never blocked.
+  /// Show with a 3-second timeout fallback (Today tab "Start Lesson").
   Future<void> showInterstitialWithTimeout({
     required VoidCallback onDismissed,
     Duration timeout = const Duration(seconds: 3),
@@ -155,7 +145,45 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // REWARDED  (locked lesson unlock — opt-in only)
+  // AGGRESSIVE CONTENT CLICK  (Explore tab)
+  // Ad fires every 2-3 content clicks — randomised threshold.
+  // 60s cooldown ensures AdMob compliance.
+  // ─────────────────────────────────────────────────────────────
+  Future<void> showInterstitialOnContentClick({
+    required VoidCallback onDismissed,
+  }) async {
+    if (HiveService.getProgress().isPremium) { onDismissed(); return; }
+    _contentClicks++;
+    if (_contentClicks >= _contentThresh) {
+      _contentClicks = 0;
+      // Alternate 2 → 3 → 2 → 3 with slight randomness
+      _contentThresh = 2 + _rng.nextInt(2); // 2 or 3
+      await showInterstitial(onDismissed: onDismissed);
+    } else {
+      onDismissed();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // AGGRESSIVE LESSON TAP  (My Path tab)
+  // Same 2-3 pattern but tracked independently from content clicks.
+  // ─────────────────────────────────────────────────────────────
+  Future<void> showInterstitialOnLessonTap({
+    required VoidCallback onDismissed,
+  }) async {
+    if (HiveService.getProgress().isPremium) { onDismissed(); return; }
+    _lessonTaps++;
+    if (_lessonTaps >= _lessonThresh) {
+      _lessonTaps = 0;
+      _lessonThresh = 2 + _rng.nextInt(2); // 2 or 3
+      await showInterstitial(onDismissed: onDismissed);
+    } else {
+      onDismissed();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // REWARDED
   // ─────────────────────────────────────────────────────────────
   Future<void> loadRewarded() async {
     if (_rewardedLoading || _rewarded != null) return;
@@ -178,19 +206,17 @@ class AdManager {
     if (_rewarded == null) { loadRewarded(); onDismissed?.call(); return; }
     _rewarded!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _rewarded = null; loadRewarded();
-        onDismissed?.call();
+        ad.dispose(); _rewarded = null; loadRewarded(); onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _rewarded = null; loadRewarded();
-        onDismissed?.call();
+        ad.dispose(); _rewarded = null; loadRewarded(); onDismissed?.call();
       },
     );
     await _rewarded!.show(onUserEarnedReward: (_, r) => onEarned(r));
   }
 
   // ─────────────────────────────────────────────────────────────
-  // REWARDED INTERSTITIAL  (XP boost — opt-in only)
+  // REWARDED INTERSTITIAL
   // ─────────────────────────────────────────────────────────────
   Future<void> loadRewardedInterstitial() async {
     if (_rewardedIntLoading || _rewardedInterstitial != null) return;
@@ -215,19 +241,19 @@ class AdManager {
     }
     _rewardedInterstitial!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _rewardedInterstitial = null; loadRewardedInterstitial();
-        onDismissed?.call();
+        ad.dispose(); _rewardedInterstitial = null;
+        loadRewardedInterstitial(); onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _rewardedInterstitial = null; loadRewardedInterstitial();
-        onDismissed?.call();
+        ad.dispose(); _rewardedInterstitial = null;
+        loadRewardedInterstitial(); onDismissed?.call();
       },
     );
     await _rewardedInterstitial!.show(onUserEarnedReward: (_, r) => onEarned(r));
   }
 
   // ─────────────────────────────────────────────────────────────
-  // BANNER  (created on demand per screen)
+  // BANNER  (created on demand — each screen owns its instance)
   // ─────────────────────────────────────────────────────────────
   BannerAd createBannerAd([AdSize size = AdSize.banner]) => BannerAd(
         adUnitId: _bannerId,
@@ -237,13 +263,10 @@ class AdManager {
       );
 
   // ─────────────────────────────────────────────────────────────
-  // NATIVE  (created on demand per slot in Explore)
+  // NATIVE  (unit ID exposed; each slot creates its own NativeAd)
   // ─────────────────────────────────────────────────────────────
   String get nativeAdUnitId => _nativeId;
 
-  // ─────────────────────────────────────────────────────────────
-  // CLEANUP
-  // ─────────────────────────────────────────────────────────────
   void dispose() {
     _interstitial?.dispose();
     _rewarded?.dispose();

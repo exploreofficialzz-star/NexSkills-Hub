@@ -40,9 +40,9 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
       return;
     }
 
-    // Attempt interstitial on every tap — 60s cooldown in AdManager ensures
-    // the user doesn't see more than one ad per minute.
-    AdManager.instance.showInterstitial(
+    // Aggressive: interstitial every 2-3 lesson taps (randomised threshold).
+    // Independent counter from Explore clicks. 60s cooldown is the safety valve.
+    AdManager.instance.showInterstitialOnLessonTap(
       onDismissed: () => _navigateToContent(step),
     );
   }
