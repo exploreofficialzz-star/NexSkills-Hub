@@ -3,6 +3,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/services/ad_service.dart';
 import '../../core/services/ad_manager.dart';
 import '../../core/services/content_health_service.dart';
+import '../../core/services/notification_service.dart';
+import '../../core/services/hive_service.dart';
 import '../../core/services/hive_service.dart';
 import '../today/today_screen.dart';
 import '../paths/paths_screen.dart';
@@ -43,7 +45,28 @@ class _HomeScreenState extends State<HomeScreen>
       await AdManager.instance.init();
       AdService.preloadAllPostFrame();
       ContentHealthService.runDailyCheckInBackground();
+      // Request notification permissions and schedule daily reminder
+      _setupNotifications();
     });
+  }
+
+  Future<void> _setupNotifications() async {
+    try {
+      // Request permission (Android 13+ / iOS require explicit grant)
+      final granted = await NotificationService.requestPermissions();
+      if (!granted) return;
+      // Schedule daily reminder at 8:00 AM
+      final progress = HiveService.getProgress();
+      await NotificationService.scheduleDailyReminder(
+        hour: 8,
+        minute: 0,
+        streakDays: progress.streakDays,
+      );
+      // Schedule streak warning at 8 PM if user has an active streak
+      if (progress.streakDays > 0) {
+        await NotificationService.scheduleStreakWarning(progress.streakDays);
+      }
+    } catch (_) {}
   }
 
   @override

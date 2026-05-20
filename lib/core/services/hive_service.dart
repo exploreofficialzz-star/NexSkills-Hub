@@ -31,6 +31,9 @@ class HiveService {
   static Box<ResourceModel> get _resources =>
       Hive.box<ResourceModel>(_resourceBox);
 
+  /// Public access for RssService new-item notification count.
+  static Box<ResourceModel> get resourceBox => _resources;
+
   static List<ResourceModel> getResourcesByCategory(String category) {
     return _resources.values
         .where((r) => r.category == category)

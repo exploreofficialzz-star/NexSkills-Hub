@@ -27,8 +27,6 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _refreshing = false;
   String? _error;
 
-  BannerAd? _bottomBanner;
-  bool _bottomBannerLoaded = false;
 
   static const _categories = [
     ('all', '🌐', 'All'),
@@ -54,22 +52,14 @@ class _ExploreScreenState extends State<ExploreScreen>
     _consumedIds = HiveService.getAllConsumedIds();
     _loadFromCache();
     _fetchFresh();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _loadBottomBanner());
+    // Sticky banner removed — it overlapped the floating nav bar.
   }
 
   @override
   void dispose() {
-    _bottomBanner?.dispose();
     super.dispose();
   }
 
-  Future<void> _loadBottomBanner() async {
-    if (HiveService.getProgress().isPremium) return;
-    final ad = AdManager.instance.createBannerAd(AdSize.banner);
-    await ad.load();
-    if (mounted) setState(() { _bottomBanner = ad; _bottomBannerLoaded = true; });
-  }
 
   void _loadFromCache() {
     const allCats = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
@@ -195,8 +185,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                         child: _buildList(c),
                       ),
               ),
-              if (_bottomBannerLoaded && _bottomBanner != null)
-                _StickyBanner(ad: _bottomBanner!, c: c),
+              // Banner removed — native ads every 3 items provide ad revenue
             ],
           ),
         ),
@@ -454,7 +443,16 @@ class _Thumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumb = resource.thumbnail;
+    // Compute effective thumbnail at render time.
+    // If stored thumbnail is null, try clearbit logo from the article URL.
+    // This handles old cached articles stored before the clearbit fallback was added.
+    String? thumb = resource.thumbnail;
+    if (thumb == null && resource.url.isNotEmpty) {
+      try {
+        final host = Uri.parse(resource.url).host.replaceAll('www.', '');
+        if (host.isNotEmpty) thumb = 'https://logo.clearbit.com/$host';
+      } catch (_) {}
+    }
     const h = 190.0;
     final radius = const BorderRadius.vertical(top: Radius.circular(16));
     final isClearbit = thumb != null && thumb.contains('logo.clearbit.com');
@@ -689,28 +687,4 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
               style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5))),
     );
   }
-}
-
-// ─── Sticky bottom banner ─────────────────────────────────────────────────────
-class _StickyBanner extends StatelessWidget {
-  final BannerAd ad;
-  final NexColors c;
-  const _StickyBanner({required this.ad, required this.c});
-  @override
-  Widget build(BuildContext context) => RepaintBoundary(
-    child: Container(
-      color: c.surface,
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(height: 0.5, color: c.border),
-        Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Text('Advertisement',
-              style: TextStyle(color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
-        ),
-        SizedBox(width: ad.size.width.toDouble(), height: ad.size.height.toDouble(),
-            child: AdWidget(ad: ad)),
-        const SizedBox(height: 4),
-      ]),
-    ),
-  );
 }
