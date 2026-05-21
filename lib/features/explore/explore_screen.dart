@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
@@ -72,12 +73,74 @@ class _ExploreScreenState extends State<ExploreScreen>
     });
   }
 
+  /// Smart feed — interleaves content from ALL categories and mixes
+  /// videos with articles so no single source dominates.
+  ///
+  /// Algorithm:
+  ///   1. Separate unconsumed / consumed
+  ///   2. Within each group: group by category, sort each by date
+  ///   3. Round-robin across categories (ai → cyber → nocode → data → cloud)
+  ///   4. Insert a video every 3rd slot when available
+  ///   5. Consumed items sink to the bottom
   List<ResourceModel> _sortWithConsumedAtBottom(List<ResourceModel> src) {
-    final unconsumed = src.where((r) => !_consumedIds.contains(r.id)).toList()
+    final unconsumed = src.where((r) => !_consumedIds.contains(r.id)).toList();
+    final consumed   = src.where((r) => _consumedIds.contains(r.id)).toList();
+    return [..._interleave(unconsumed), ..._interleave(consumed)];
+  }
+
+  List<ResourceModel> _interleave(List<ResourceModel> items) {
+    if (items.isEmpty) return items;
+
+    // Separate videos and articles
+    final videos   = items.where(_isVideo).toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    final consumed = src.where((r) => _consumedIds.contains(r.id)).toList()
-      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    return [...unconsumed, ...consumed];
+    final articles = items.where((r) => !_isVideo(r)).toList();
+
+    // Group articles by category in a fixed order for consistency
+    const catOrder = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
+    final groups = <String, List<ResourceModel>>{
+      for (final cat in catOrder) cat: [],
+    };
+    for (final r in articles) {
+      groups.putIfAbsent(r.category, () => []);
+      groups[r.category]!.add(r);
+    }
+    // Sort each group newest-first
+    for (final g in groups.values) {
+      g.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    }
+
+    final result = <ResourceModel>[];
+    final keys = groups.keys.where((k) => groups[k]!.isNotEmpty).toList();
+    int videoIdx = 0;
+    int totalAdded = 0;
+
+    bool hasMore = true;
+    while (hasMore) {
+      hasMore = false;
+      for (final key in keys) {
+        final list = groups[key]!;
+        if (list.isEmpty) continue;
+
+        // Insert a video every 3rd article slot
+        if (videoIdx < videos.length && totalAdded % 3 == 2) {
+          result.add(videos[videoIdx++]);
+          totalAdded++;
+          hasMore = true;
+        }
+
+        result.add(list.removeAt(0));
+        totalAdded++;
+        hasMore = true;
+      }
+    }
+
+    // Append remaining videos at end
+    if (videoIdx < videos.length) {
+      result.addAll(videos.sublist(videoIdx));
+    }
+
+    return result;
   }
 
   Future<void> _fetchFresh() async {

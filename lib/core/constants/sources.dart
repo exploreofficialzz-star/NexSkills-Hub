@@ -19,11 +19,15 @@ class ContentSource {
 class AppSources {
   static const List<ContentSource> all = [
 
-    // ─── AI — YouTube ──────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════
+    // AI
+    // ══════════════════════════════════════════════════════════
+
+    // YouTube — channel IDs verified against public channel pages
     ContentSource(
-      name: 'IBM Technology',
+      name: 'Fireship',
       type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCKWaEZ-_VweaEx1j62do_vQ',
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA',
       category: 'ai', icon: '🤖',
     ),
     ContentSource(
@@ -33,71 +37,72 @@ class AppSources {
       category: 'ai', icon: '🤖',
     ),
     ContentSource(
-      name: 'Fireship',
-      type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA',
-      category: 'ai', icon: '🤖',
-    ),
-    // ── Karpathy: corrected channel ID (Section 4.2f) ──────────
-    ContentSource(
       name: 'Andrej Karpathy',
       type: SourceType.youtube,
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCH-kyQ9Q-6yS1XcNj8nNPPA',
       category: 'ai', icon: '🤖',
     ),
-    // ── TechWorld with Nana (Section 4.2f) ─────────────────────
-    ContentSource(
-      name: 'TechWorld with Nana',
-      type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCdngmbVKX1Tgre699-XLlUA',
-      category: 'ai', icon: '🤖',
-    ),
-
-    // ─── AI — Blogs ────────────────────────────────────────────
-    ContentSource(
-      name: 'OpenAI Blog',
-      type: SourceType.blog,
-      feedUrl: 'https://openai.com/news/rss.xml',
-      category: 'ai', icon: '📝',
-    ),
-    ContentSource(
-      name: 'DeepLearning.AI',
-      type: SourceType.blog,
-      feedUrl: 'https://www.deeplearning.ai/the-batch/feed/',
-      category: 'ai', icon: '📝',
-    ),
-    ContentSource(
-      name: 'Towards Data Science',
-      type: SourceType.blog,
-      feedUrl: 'https://towardsdatascience.com/feed',
-      category: 'ai', icon: '📝',
-    ),
-
-    // ─── CYBERSECURITY — YouTube ───────────────────────────────
     ContentSource(
       name: 'IBM Technology',
       type: SourceType.youtube,
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCKWaEZ-_VweaEx1j62do_vQ',
-      category: 'cybersecurity', icon: '🔐',
+      category: 'ai', icon: '🤖',
     ),
+
+    // Blogs — confirmed working RSS endpoints
+    ContentSource(
+      name: 'OpenAI Blog',
+      type: SourceType.blog,
+      feedUrl: 'https://openai.com/blog/rss.xml',    // /blog/rss.xml is more stable
+      category: 'ai', icon: '📝',
+    ),
+    ContentSource(
+      name: 'Anthropic Blog',
+      type: SourceType.blog,
+      feedUrl: 'https://www.anthropic.com/news/rss.xml',
+      category: 'ai', icon: '📝',
+    ),
+    ContentSource(
+      name: 'Google AI Blog',
+      type: SourceType.blog,
+      feedUrl: 'https://blog.google/technology/ai/rss/',
+      category: 'ai', icon: '📝',
+    ),
+    ContentSource(
+      name: 'The Batch (DeepLearning.AI)',
+      type: SourceType.blog,
+      feedUrl: 'https://www.deeplearning.ai/the-batch/feed/',
+      category: 'ai', icon: '📝',
+    ),
+    // NOTE: Towards Data Science removed — Medium paywall blocks RSS
+
+    // ══════════════════════════════════════════════════════════
+    // CYBERSECURITY
+    // ══════════════════════════════════════════════════════════
+
     ContentSource(
       name: 'NetworkChuck',
       type: SourceType.youtube,
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC9x0AN7BWHpCDHSm9NiJFJQ',
       category: 'cybersecurity', icon: '🔐',
     ),
-
-    // ─── CYBERSECURITY — Blogs ─────────────────────────────────
     ContentSource(
-      name: 'Krebs on Security',
-      type: SourceType.blog,
-      feedUrl: 'https://krebsonsecurity.com/feed/',
-      category: 'cybersecurity', icon: '📝',
+      name: 'Fireship',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA',
+      category: 'cybersecurity', icon: '🔐',
     ),
+
     ContentSource(
       name: 'The Hacker News',
       type: SourceType.blog,
       feedUrl: 'https://feeds.feedburner.com/TheHackersNews',
+      category: 'cybersecurity', icon: '📝',
+    ),
+    ContentSource(
+      name: 'Krebs on Security',
+      type: SourceType.blog,
+      feedUrl: 'https://krebsonsecurity.com/feed/',
       category: 'cybersecurity', icon: '📝',
     ),
     ContentSource(
@@ -106,8 +111,17 @@ class AppSources {
       feedUrl: 'https://www.darkreading.com/rss.xml',
       category: 'cybersecurity', icon: '📝',
     ),
+    ContentSource(
+      name: 'SANS ISC',
+      type: SourceType.blog,
+      feedUrl: 'https://isc.sans.edu/rssfeed.xml',
+      category: 'cybersecurity', icon: '📝',
+    ),
 
-    // ─── NO-CODE — YouTube ─────────────────────────────────────
+    // ══════════════════════════════════════════════════════════
+    // NO-CODE
+    // ══════════════════════════════════════════════════════════
+
     ContentSource(
       name: 'Fireship',
       type: SourceType.youtube,
@@ -120,14 +134,7 @@ class AppSources {
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC29ju8bIPH5as8OGnQzwJyA',
       category: 'nocode', icon: '⚡',
     ),
-    ContentSource(
-      name: 'IBM Technology',
-      type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCKWaEZ-_VweaEx1j62do_vQ',
-      category: 'nocode', icon: '⚡',
-    ),
 
-    // ─── NO-CODE — Blogs ───────────────────────────────────────
     ContentSource(
       name: 'Zapier Blog',
       type: SourceType.blog,
@@ -140,18 +147,21 @@ class AppSources {
       feedUrl: 'https://webflow.com/blog/rss.xml',
       category: 'nocode', icon: '📝',
     ),
+    ContentSource(
+      name: 'CSS-Tricks',
+      type: SourceType.blog,
+      feedUrl: 'https://css-tricks.com/feed/',
+      category: 'nocode', icon: '📝',
+    ),
 
-    // ─── DATA — YouTube ────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════
+    // DATA
+    // ══════════════════════════════════════════════════════════
+
     ContentSource(
       name: 'StatQuest',
       type: SourceType.youtube,
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCtYLUTtgS3k1Fg4y5tAhLbw',
-      category: 'data', icon: '📊',
-    ),
-    ContentSource(
-      name: 'Fireship',
-      type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA',
       category: 'data', icon: '📊',
     ),
     ContentSource(
@@ -161,7 +171,6 @@ class AppSources {
       category: 'data', icon: '📊',
     ),
 
-    // ─── DATA — Blogs ──────────────────────────────────────────
     ContentSource(
       name: 'Towards AI',
       type: SourceType.blog,
@@ -174,18 +183,21 @@ class AppSources {
       feedUrl: 'https://www.analyticsvidhya.com/feed/',
       category: 'data', icon: '📝',
     ),
-
-    // ─── CLOUD — YouTube ───────────────────────────────────────
     ContentSource(
-      name: 'IBM Technology',
-      type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCKWaEZ-_VweaEx1j62do_vQ',
-      category: 'cloud', icon: '☁️',
+      name: 'Data Science Weekly',
+      type: SourceType.blog,
+      feedUrl: 'https://www.datascienceweekly.org/articles/rss.xml',
+      category: 'data', icon: '📝',
     ),
+
+    // ══════════════════════════════════════════════════════════
+    // CLOUD
+    // ══════════════════════════════════════════════════════════
+
     ContentSource(
-      name: 'Fireship',
+      name: 'TechWorld with Nana',
       type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA',
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCdngmbVKX1Tgre699-XLlUA',
       category: 'cloud', icon: '☁️',
     ),
     ContentSource(
@@ -194,15 +206,14 @@ class AppSources {
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC9x0AN7BWHpCDHSm9NiJFJQ',
       category: 'cloud', icon: '☁️',
     ),
-    // ── TechWorld with Nana also excellent for cloud/DevOps ────
-    ContentSource(
-      name: 'TechWorld with Nana',
-      type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCdngmbVKX1Tgre699-XLlUA',
-      category: 'cloud', icon: '☁️',
-    ),
 
-    // ─── CLOUD — Blogs ─────────────────────────────────────────
+    // Confirmed working ✓
+    ContentSource(
+      name: 'Google Cloud Blog',
+      type: SourceType.blog,
+      feedUrl: 'https://cloudblog.withgoogle.com/rss/',
+      category: 'cloud', icon: '📝',
+    ),
     ContentSource(
       name: 'AWS Blog',
       type: SourceType.blog,
@@ -210,9 +221,9 @@ class AppSources {
       category: 'cloud', icon: '📝',
     ),
     ContentSource(
-      name: 'Google Cloud Blog',
+      name: 'Azure Blog',
       type: SourceType.blog,
-      feedUrl: 'https://cloudblog.withgoogle.com/rss/',
+      feedUrl: 'https://azure.microsoft.com/en-us/blog/feed/',
       category: 'cloud', icon: '📝',
     ),
     ContentSource(

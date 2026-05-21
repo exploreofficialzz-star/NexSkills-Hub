@@ -47,11 +47,31 @@ class RssService {
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
   }
 
+  // Browser UA for YouTube — their Atom feeds block non-browser clients
+  static const _youtubeBrowserUA =
+      'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+  static const _appUA = 'NexSkillsHub/1.0 RSS Reader';
+
   static Future<List<ResourceModel>> _fetchSource(ContentSource source) async {
+    final isYT = source.type == SourceType.youtube;
+    final headers = isYT
+        ? {
+            'User-Agent': _youtubeBrowserUA,
+            'Accept': 'application/atom+xml, application/xml, text/xml, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+          }
+        : {
+            'User-Agent': _appUA,
+            'Accept': 'application/rss+xml, application/atom+xml, */*',
+          };
+
     final response = await http
-        .get(Uri.parse(source.feedUrl), headers: {'User-Agent': 'NexSkillsHub/1.0'})
-        .timeout(const Duration(seconds: 20));
-    if (response.statusCode != 200) return [];
+        .get(Uri.parse(source.feedUrl), headers: headers)
+        .timeout(const Duration(seconds: 25));
+
+    // Accept 200 and common redirect targets (some feeds return 301→200)
+    if (response.statusCode < 200 || response.statusCode >= 400) return [];
 
     // Parse synchronously on the main isolate.
     // compute() was causing silent failures: any exception inside the isolate
