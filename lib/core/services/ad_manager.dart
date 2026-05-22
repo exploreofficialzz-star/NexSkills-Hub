@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../constants/app_constants.dart';
 import 'hive_service.dart';
 
 /// AdManager — precise, professionally-placed ad orchestration.
@@ -31,26 +33,47 @@ class AdManager {
   AdManager._();
   static final AdManager instance = AdManager._();
 
-  // ── Test IDs (Google official) ─────────────────────────────────
+  // ── Test IDs (Google's official test units — safe in debug mode) ──
   static const _testInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
   static const _testRewardedId     = 'ca-app-pub-3940256099942544/5224354917';
   static const _testBannerId       = 'ca-app-pub-3940256099942544/6300978111';
   static const _testRewardedIntId  = 'ca-app-pub-3940256099942544/5354046379';
   static const _testNativeId       = 'ca-app-pub-3940256099942544/2247696110';
 
-  // ── Real IDs — replace before release ─────────────────────────
-  static const _realInterstitialId = 'ca-app-pub-REPLACE/REPLACE';
-  static const _realRewardedId     = 'ca-app-pub-REPLACE/REPLACE';
-  static const _realBannerId       = 'ca-app-pub-REPLACE/REPLACE';
-  static const _realRewardedIntId  = 'ca-app-pub-REPLACE/REPLACE';
-  static const _realNativeId       = 'ca-app-pub-REPLACE/REPLACE';
+  // ── Production IDs — read from AdConstants (same source as AdService) ────
+  // Debug  → test IDs (always loads; never real revenue)
+  // Release → AdConstants real IDs (your AdMob account)
+  String get _interstitialId => kDebugMode
+      ? _testInterstitialId
+      : Platform.isIOS
+          ? AdConstants.iosInterstitialId
+          : AdConstants.androidInterstitialId;
 
-  String get _interstitialId => kDebugMode ? _testInterstitialId : _realInterstitialId;
-  String get _rewardedId     => kDebugMode ? _testRewardedId     : _realRewardedId;
-  String get _bannerId       => kDebugMode ? _testBannerId       : _realBannerId;
-  String get _rewardedIntId  => kDebugMode ? _testRewardedIntId  : _realRewardedIntId;
-  String get _nativeId       => kDebugMode ? _testNativeId       : _realNativeId;
-  String get nativeAdUnitId  => _nativeId;
+  String get _rewardedId => kDebugMode
+      ? _testRewardedId
+      : Platform.isIOS
+          ? AdConstants.iosRewardedId
+          : AdConstants.androidRewardedId;
+
+  String get _bannerId => kDebugMode
+      ? _testBannerId
+      : Platform.isIOS
+          ? AdConstants.iosBannerId
+          : AdConstants.androidBannerId;
+
+  String get _rewardedIntId => kDebugMode
+      ? _testRewardedIntId
+      : Platform.isIOS
+          ? AdConstants.iosRewardedInterstitialId
+          : AdConstants.androidRewardedInterstitialId;
+
+  String get _nativeId => kDebugMode
+      ? _testNativeId
+      : Platform.isIOS
+          ? AdConstants.iosNativeId
+          : AdConstants.androidNativeId;
+
+  String get nativeAdUnitId => _nativeId;
 
   // ── Ad instances ───────────────────────────────────────────────
   InterstitialAd?         _interstitial;
@@ -63,7 +86,7 @@ class AdManager {
 
   // ── 60-second global cooldown ──────────────────────────────────
   DateTime? _lastShownAt;
-  static const _cooldownSeconds = 60;
+  static const _cooldownSeconds = AdConstants.interstitialCooldownSeconds; // 90s
 
   // ── Explore click counter ──────────────────────────────────────
   // Pattern: clicks 1, 4, 7, 10… get an ad  (every 3rd, starting at 1)
