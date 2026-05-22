@@ -40,10 +40,10 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
       return;
     }
 
-    // Aggressive: interstitial every 2-3 lesson taps (randomised threshold).
-    // Independent counter from Explore clicks. 60s cooldown is the safety valve.
+    // MY PATH RULE: odd steps (1,3,5,7…) → interstitial; even steps → no ad.
     AdManager.instance.showInterstitialOnLessonTap(
       onDismissed: () => _navigateToContent(step),
+      stepOrder: step.order,
     );
   }
 
@@ -112,9 +112,20 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
             sliver: SliverList(
+              // Native ad inserted after every 4 steps
               delegate: SliverChildBuilderDelegate(
                 (_, i) {
-                  final step = widget.path.steps[i];
+                  // Every 5th slot (index 4, 9, 14…) is a native ad
+                  final isPremium = HiveService.getProgress().isPremium;
+                  if (!isPremium && i % 5 == 4) {
+                    return _PathNativeAdSlot(c: c);
+                  }
+                  // Map list index → step index (accounting for ad slots)
+                  final adsBefore = i ~/ 5;
+                  final stepIdx   = i - adsBefore;
+                  if (stepIdx >= widget.path.steps.length) return const SizedBox.shrink();
+
+                  final step = widget.path.steps[stepIdx];
                   final isDone = completed.contains(step.order);
                   final isLocked = !isDone &&
                       step.order > 1 &&
@@ -130,7 +141,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
                     onTap: () => _openStep(step),
                   );
                 },
-                childCount: widget.path.steps.length,
+                childCount: _totalSlots(widget.path.steps.length),
               ),
             ),
           ),
@@ -204,6 +215,82 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+int _totalSlots(int stepCount) {
+  // Total list items = steps + native ad slots (one per every 5)
+  final adSlots = stepCount ~/ 4; // ad after every 4 steps
+  return stepCount + adSlots;
+}
+
+// ─── Native Ad Slot in Path Detail ────────────────────────────────────────────
+class _PathNativeAdSlot extends StatefulWidget {
+  final NexColors c;
+  const _PathNativeAdSlot({required this.c});
+  @override
+  State<_PathNativeAdSlot> createState() => _PathNativeAdSlotState();
+}
+
+class _PathNativeAdSlotState extends State<_PathNativeAdSlot> {
+  NativeAd? _ad;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ad = NativeAd(
+      adUnitId: AdManager.instance.nativeAdUnitId,
+      listener: NativeAdListener(
+        onAdLoaded: (_) { if (mounted) setState(() => _loaded = true); },
+        onAdFailedToLoad: (ad, _) { ad.dispose(); _ad = null; },
+      ),
+      request: const AdRequest(),
+      nativeTemplateStyle: NativeTemplateStyle(
+        templateType: TemplateType.small,
+        mainBackgroundColor: widget.c.card,
+        cornerRadius: 12,
+        callToActionTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white,
+          backgroundColor: NexColors.primary,
+          style: NativeTemplateFontStyle.bold,
+          size: 14,
+        ),
+        primaryTextStyle: NativeTemplateTextStyle(
+          textColor: widget.c.textPrimary,
+          style: NativeTemplateFontStyle.bold,
+          size: 14,
+        ),
+        secondaryTextStyle: NativeTemplateTextStyle(
+          textColor: widget.c.textMuted,
+          style: NativeTemplateFontStyle.normal,
+          size: 12,
+        ),
+      ),
+    )..load();
+  }
+
+  @override
+  void dispose() { _ad?.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      height: 80,
+      decoration: BoxDecoration(
+        color: c.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.border, width: 0.5),
+      ),
+      child: _loaded && _ad != null
+          ? AdWidget(ad: _ad!)
+          : Center(child: Text('Advertisement',
+              style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5))),
     );
   }
 }

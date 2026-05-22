@@ -3,27 +3,35 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'hive_service.dart';
 
-/// AdManager — aggressive ad orchestration.
+/// AdManager — precise, professionally-placed ad orchestration.
 ///
-/// Ad formats:
-///   ✓ Banner        — sticky footer + inline Today/Explore
-///   ✓ Interstitial  — every 2-3 content clicks / lesson taps
-///   ✓ Rewarded      — locked lesson unlock (opt-in)
-///   ✓ Rewarded Int  — XP boost (opt-in)
-///   ✓ Native        — every 3 items in Explore list
-///   ✗ App-open      — excluded per product decision
-///   ✗ Tab-switch    — excluded per product decision
+/// Placement rules (per product spec):
 ///
-/// Interstitial strategy:
-///   Two independent counters (content & lessons) each using a
-///   randomised 2-3 threshold:  clicks 2→ad, 3→ad, 2→ad, 3→ad …
-///   The 60-second cooldown ensures AdMob policy compliance.
+/// TODAY TAB
+///   • Banner   : inline between streak card and lesson (always)
+///   • Interstitial: EVERY "Start Today's Lesson" tap (60s cooldown guards freq)
+///
+/// MY PATH TAB
+///   • Interstitial: ODD steps (1, 3, 5, 7…) → show ad
+///                   EVEN steps (2, 4, 6, 8…) → navigate directly, no ad
+///   • Native ad : inserted every 4 steps in the step list
+///
+/// EXPLORE TAB
+///   • Banner   : at the bottom of the scrollable list
+///   • Interstitial: clicks 1, 4, 7, 10… (every 3rd, starting from click 1)
+///                   clicks 2, 3, 5, 6, 8, 9… → navigate directly, no ad
+///   • Native ad : every 3 items in the feed
+///
+/// GLOBAL RULES
+///   • Premium users → zero ads
+///   • 60-second global cooldown between interstitials (AdMob policy min)
+///   • Auto-reload immediately after every ad dismiss
+///   • App-open ads: excluded per product decision
 class AdManager {
   AdManager._();
   static final AdManager instance = AdManager._();
-  final _rng = Random();
 
-  // ── Test IDs ───────────────────────────────────────────────────
+  // ── Test IDs (Google official) ─────────────────────────────────
   static const _testInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
   static const _testRewardedId     = 'ca-app-pub-3940256099942544/5224354917';
   static const _testBannerId       = 'ca-app-pub-3940256099942544/6300978111';
@@ -42,6 +50,7 @@ class AdManager {
   String get _bannerId       => kDebugMode ? _testBannerId       : _realBannerId;
   String get _rewardedIntId  => kDebugMode ? _testRewardedIntId  : _realRewardedIntId;
   String get _nativeId       => kDebugMode ? _testNativeId       : _realNativeId;
+  String get nativeAdUnitId  => _nativeId;
 
   // ── Ad instances ───────────────────────────────────────────────
   InterstitialAd?         _interstitial;
@@ -56,21 +65,16 @@ class AdManager {
   DateTime? _lastShownAt;
   static const _cooldownSeconds = 60;
 
-  // ── Content click counter (Explore) ───────────────────────────
-  // Threshold alternates 2 → 3 → 2 → 3 …
-  int _contentClicks  = 0;
-  int _contentThresh  = 2; // first ad after 2nd click
-
-  // ── Lesson tap counter (My Path) ──────────────────────────────
-  int _lessonTaps    = 0;
-  int _lessonThresh  = 2; // first ad after 2nd lesson tap
+  // ── Explore click counter ──────────────────────────────────────
+  // Pattern: clicks 1, 4, 7, 10… get an ad  (every 3rd, starting at 1)
+  int _exploreClickCount = 0;
 
   bool get isInterstitialReady => _interstitial != null;
   bool get isRewardedReady     => _rewarded != null;
 
   static const _request = AdRequest();
 
-  // ── Init — postFrameCallback only ─────────────────────────────
+  // ── Init (postFrameCallback only) ─────────────────────────────
   Future<void> init() async {
     loadInterstitial();
     loadRewarded();
@@ -78,7 +82,7 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // INTERSTITIAL — core show logic
+  // INTERSTITIAL — core
   // ─────────────────────────────────────────────────────────────
   Future<void> loadInterstitial() async {
     if (_interstitialLoading || _interstitial != null) return;
@@ -97,12 +101,11 @@ class AdManager {
     );
   }
 
-  bool _isCoolingDown() {
-    if (_lastShownAt == null) return false;
-    return DateTime.now().difference(_lastShownAt!).inSeconds < _cooldownSeconds;
-  }
+  bool _isCoolingDown() =>
+      _lastShownAt != null &&
+      DateTime.now().difference(_lastShownAt!).inSeconds < _cooldownSeconds;
 
-  /// Raw show — used internally. [onDismissed] always fires.
+  /// Raw show — [onDismissed] ALWAYS fires, navigation never blocked.
   Future<bool> showInterstitial({VoidCallback? onDismissed}) async {
     if (HiveService.getProgress().isPremium) { onDismissed?.call(); return false; }
     if (_isCoolingDown())                    { onDismissed?.call(); return false; }
@@ -113,15 +116,13 @@ class AdManager {
     }
     _interstitial!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _interstitial = null;
+        ad.dispose(); _interstitial = null;
         _lastShownAt = DateTime.now();
         loadInterstitial();
         onDismissed?.call();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _interstitial = null;
+        ad.dispose(); _interstitial = null;
         loadInterstitial();
         onDismissed?.call();
       },
@@ -130,7 +131,7 @@ class AdManager {
     return true;
   }
 
-  /// Show with a 3-second timeout fallback (Today tab "Start Lesson").
+  /// Timeout fallback (Today tab "Start Lesson" — 3s max wait).
   Future<void> showInterstitialWithTimeout({
     required VoidCallback onDismissed,
     Duration timeout = const Duration(seconds: 3),
@@ -145,37 +146,46 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // AGGRESSIVE CONTENT CLICK  (Explore tab)
-  // Ad fires every 2-3 content clicks — randomised threshold.
-  // 60s cooldown ensures AdMob compliance.
+  // TODAY TAB — "Start Today's Lesson"
+  // Attempt interstitial on EVERY tap. 60s cooldown is the guard.
   // ─────────────────────────────────────────────────────────────
-  Future<void> showInterstitialOnContentClick({
+  Future<void> showInterstitialForTodayLesson({
     required VoidCallback onDismissed,
   }) async {
     if (HiveService.getProgress().isPremium) { onDismissed(); return; }
-    _contentClicks++;
-    if (_contentClicks >= _contentThresh) {
-      _contentClicks = 0;
-      // Alternate 2 → 3 → 2 → 3 with slight randomness
-      _contentThresh = 2 + _rng.nextInt(2); // 2 or 3
-      await showInterstitial(onDismissed: onDismissed);
-    } else {
-      onDismissed();
-    }
+    // Every tap attempts an ad — cooldown naturally limits to 1/min
+    await showInterstitialWithTimeout(onDismissed: onDismissed);
   }
 
   // ─────────────────────────────────────────────────────────────
-  // AGGRESSIVE LESSON TAP  (My Path tab)
-  // Same 2-3 pattern but tracked independently from content clicks.
+  // MY PATH TAB — step-based rule
+  // Odd steps  (1, 3, 5, 7…) → show interstitial
+  // Even steps (2, 4, 6, 8…) → navigate directly, no ad
   // ─────────────────────────────────────────────────────────────
   Future<void> showInterstitialOnLessonTap({
     required VoidCallback onDismissed,
+    required int stepOrder,
   }) async {
     if (HiveService.getProgress().isPremium) { onDismissed(); return; }
-    _lessonTaps++;
-    if (_lessonTaps >= _lessonThresh) {
-      _lessonTaps = 0;
-      _lessonThresh = 2 + _rng.nextInt(2); // 2 or 3
+    if (stepOrder.isOdd) {
+      await showInterstitial(onDismissed: onDismissed);
+    } else {
+      onDismissed(); // Even steps — no ad
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // EXPLORE TAB — every-3rd-click rule
+  // Clicks 1, 4, 7, 10… → interstitial
+  // Clicks 2, 3, 5, 6, 8, 9… → navigate directly
+  // ─────────────────────────────────────────────────────────────
+  Future<void> showInterstitialOnExploreClick({
+    required VoidCallback onDismissed,
+  }) async {
+    if (HiveService.getProgress().isPremium) { onDismissed(); return; }
+    _exploreClickCount++;
+    // Pattern: 1, 4, 7, 10… → (_exploreClickCount - 1) % 3 == 0
+    if ((_exploreClickCount - 1) % 3 == 0) {
       await showInterstitial(onDismissed: onDismissed);
     } else {
       onDismissed();
@@ -183,7 +193,7 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // REWARDED
+  // REWARDED (locked lesson unlock — opt-in)
   // ─────────────────────────────────────────────────────────────
   Future<void> loadRewarded() async {
     if (_rewardedLoading || _rewarded != null) return;
@@ -216,7 +226,7 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // REWARDED INTERSTITIAL
+  // REWARDED INTERSTITIAL (XP boost — opt-in)
   // ─────────────────────────────────────────────────────────────
   Future<void> loadRewardedInterstitial() async {
     if (_rewardedIntLoading || _rewardedInterstitial != null) return;
@@ -253,19 +263,17 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // BANNER  (created on demand — each screen owns its instance)
+  // BANNER (each screen creates its own instance)
   // ─────────────────────────────────────────────────────────────
   BannerAd createBannerAd([AdSize size = AdSize.banner]) => BannerAd(
         adUnitId: _bannerId,
         size: size,
         request: _request,
-        listener: BannerAdListener(onAdFailedToLoad: (ad, _) => ad.dispose()),
+        listener: BannerAdListener(
+          onAdLoaded: (_) {}, // no-op — caller checks via _loaded flag
+          onAdFailedToLoad: (ad, _) => ad.dispose(),
+        ),
       );
-
-  // ─────────────────────────────────────────────────────────────
-  // NATIVE  (unit ID exposed; each slot creates its own NativeAd)
-  // ─────────────────────────────────────────────────────────────
-  String get nativeAdUnitId => _nativeId;
 
   void dispose() {
     _interstitial?.dispose();

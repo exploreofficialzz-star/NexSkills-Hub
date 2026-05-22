@@ -99,11 +99,9 @@ class _TodayScreenState extends State<TodayScreen>
       );
     }
 
-    // Show interstitial with 3s timeout; navigate regardless of outcome
-    AdManager.instance.showInterstitialWithTimeout(
-      onDismissed: navigate,
-      timeout: const Duration(seconds: 3),
-    );
+    // TODAY TAB RULE: attempt interstitial on EVERY "Start Today's Lesson" tap.
+    // 60-second cooldown is the only governor — AdMob policy compliance.
+    AdManager.instance.showInterstitialForTodayLesson(onDismissed: navigate);
   }
 
   @override
@@ -538,19 +536,14 @@ class _InlineBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text('Advertisement',
-            style: TextStyle(
-                color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
+            style: TextStyle(color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
         const SizedBox(height: 4),
-        Container(
-          decoration: BoxDecoration(
-            color: c.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: c.border, width: 0.5),
-          ),
-          alignment: Alignment.center,
-          width: ad.size.width.toDouble(),
+        // SizedBox fills available width; height locked to ad spec (50px for banner)
+        SizedBox(
+          width: double.infinity,
           height: ad.size.height.toDouble(),
           child: AdWidget(ad: ad),
         ),

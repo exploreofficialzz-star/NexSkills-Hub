@@ -173,8 +173,8 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   void _openResource(ResourceModel r) {
-    // Aggressive: interstitial every 2-3 content clicks
-    AdManager.instance.showInterstitialOnContentClick(
+    // EXPLORE RULE: clicks 1,4,7,10… get an ad; clicks 2,3,5,6,8,9… skip.
+    AdManager.instance.showInterstitialOnExploreClick(
       onDismissed: () {
         if (!mounted) return;
         if (_isVideo(r)) {
@@ -361,13 +361,17 @@ class _ExploreScreenState extends State<ExploreScreen>
 
     final isPremium = HiveService.getProgress().isPremium;
 
-    // Interleave: native ad every 3 content items (aggressive)
+    // Interleave: native ad every 3 content items
     final withAds = <dynamic>[];
     int count = 0;
     for (final item in items) {
       withAds.add(item);
       count++;
       if (!isPremium && count % 3 == 0) withAds.add('native_ad');
+    }
+    // Add bottom banner as final scrollable item (avoids nav-bar overlap)
+    if (!isPremium && _bottomBannerLoaded && _bottomBanner != null) {
+      withAds.add('bottom_banner');
     }
 
     return ListView.builder(
@@ -376,6 +380,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       itemCount: withAds.length,
       itemBuilder: (_, i) {
         if (withAds[i] == 'native_ad') return _NativeAdSlot(c: c);
+        if (withAds[i] == 'bottom_banner') return _ListBanner(ad: _bottomBanner!, c: c);
         final r = withAds[i] as ResourceModel;
         final isConsumed = _consumedIds.contains(r.id);
         return GestureDetector(
