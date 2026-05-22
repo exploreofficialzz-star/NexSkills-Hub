@@ -27,6 +27,8 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _loading = true;
   bool _refreshing = false;
   String? _error;
+  BannerAd? _bottomBanner;
+  bool _bottomBannerLoaded = false;
 
 
   static const _categories = [
@@ -53,14 +55,23 @@ class _ExploreScreenState extends State<ExploreScreen>
     _consumedIds = HiveService.getAllConsumedIds();
     _loadFromCache();
     _fetchFresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBottomBanner());
     // Sticky banner removed — it overlapped the floating nav bar.
   }
 
   @override
   void dispose() {
+    _bottomBanner?.dispose();
     super.dispose();
   }
 
+
+  Future<void> _loadBottomBanner() async {
+    if (HiveService.getProgress().isPremium) return;
+    final ad = AdManager.instance.createBannerAd(AdSize.banner);
+    await ad.load();
+    if (mounted) setState(() { _bottomBanner = ad; _bottomBannerLoaded = true; });
+  }
 
   void _loadFromCache() {
     const allCats = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
@@ -753,6 +764,33 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
           ? AdWidget(ad: _ad!)
           : Center(child: Text('Advertisement',
               style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5))),
+    );
+  }
+}
+
+// ─── Bottom banner as scrollable list item ────────────────────────────────────
+class _ListBanner extends StatelessWidget {
+  final BannerAd ad;
+  final NexColors c;
+  const _ListBanner({required this.ad, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Advertisement',
+              style: TextStyle(color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            height: ad.size.height.toDouble(),
+            child: AdWidget(ad: ad),
+          ),
+        ],
+      ),
     );
   }
 }
