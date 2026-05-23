@@ -91,14 +91,12 @@ class _PremiumScreenState extends State<PremiumScreen>
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.card,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 8),
-            const Text('👑', style: TextStyle(fontSize: 56)),
+            const Icon(Icons.workspace_premium_rounded, color: AppColors.gold, size: 56),
             const SizedBox(height: 16),
             const Text(
               'Welcome to Premium!',
@@ -137,7 +135,6 @@ class _PremiumScreenState extends State<PremiumScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           _buildBackground(),
@@ -151,8 +148,6 @@ class _PremiumScreenState extends State<PremiumScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        _buildSocialProof(),
-                        const SizedBox(height: 20),
                         _buildHero(),
                         const SizedBox(height: 28),
                         _buildFeatureComparison(),
@@ -162,9 +157,7 @@ class _PremiumScreenState extends State<PremiumScreen>
                         _buildCTA(),
                         const SizedBox(height: 12),
                         _buildRestoreButton(),
-                        const SizedBox(height: 20),
-                        _buildTestimonials(),
-                        const SizedBox(height: 20),
+                                const SizedBox(height: 20),
                         _buildLegal(),
                       ],
                     ),
@@ -221,95 +214,13 @@ class _PremiumScreenState extends State<PremiumScreen>
             onPressed: () => Navigator.pop(context),
           ),
           const Spacer(),
-          // Urgency badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.accentOrange.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                  color: AppColors.accentOrange.withOpacity(0.4)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('🔥', style: TextStyle(fontSize: 13)),
-                SizedBox(width: 4),
-                Text(
-                  'Limited — 50% OFF Annual',
-                  style: TextStyle(
-                    color: AppColors.accentOrange,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox.shrink(), // badge removed
         ],
       ),
     );
   }
 
-  Widget _buildSocialProof() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Avatar stack (static emoji avatars)
-        SizedBox(
-          width: 72,
-          height: 28,
-          child: Stack(
-            children: [
-              _avatar('😊', 0),
-              _avatar('🧑‍💻', 22),
-              _avatar('👩‍🔬', 44),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: RevenueConfig.learnerCount,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              TextSpan(
-                text: ' ${RevenueConfig.learnerCountLabel}',
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _avatar(String emoji, double left) {
-    return Positioned(
-      left: left,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.surface, width: 2),
-        ),
-        child: Center(
-          child: Text(emoji, style: const TextStyle(fontSize: 14)),
-        ),
-      ),
-    );
-  }
 
   Widget _buildHero() {
     return Column(
@@ -371,7 +282,7 @@ class _PremiumScreenState extends State<PremiumScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: AppColors.card, // surfaceVariant
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.surface),
       ),
@@ -566,70 +477,6 @@ class _PremiumScreenState extends State<PremiumScreen>
     );
   }
 
-  Widget _buildTestimonials() {
-    final testimonials = [
-      (
-        '⭐⭐⭐⭐⭐',
-        '"Got my first cybersecurity job after 3 months using this app daily. Worth every penny."',
-        'Marcus K., Security Analyst'
-      ),
-      (
-        '⭐⭐⭐⭐⭐',
-        '"The AI track is incredible. I went from zero to building GPT-powered apps in 8 weeks."',
-        'Priya S., Product Manager'
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'What learners say',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...testimonials.map(
-          (t) => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t.$1, style: const TextStyle(fontSize: 13)),
-                const SizedBox(height: 8),
-                Text(
-                  t.$2,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '— ${t.$3}',
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildLegal() {
     return const Text(

@@ -425,11 +425,36 @@ class _ProgressScreenState extends State<ProgressScreen> {
               _SettingsTile(
                 icon: Icons.info_outline,
                 label: 'About NexSkills Hub',
-                subtitle: 'by chAs Tech Group · v1.0.0',
+                subtitle: 'by chAs Technologies LLC · v1.0.0',
                 c: c,
                 onTap: _showAboutDialog,
               ),
             ],
+          ),
+        ),
+        // ── chAs Technologies LLC footer ──────────────────────
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 120),
+            child: Column(
+              children: [
+                Divider(color: Colors.white12, height: 1),
+                SizedBox(height: 16),
+                Text(
+                  'Made with ❤️ by chAs Technologies LLC',
+                  style: TextStyle(color: Colors.white24, fontSize: 11,
+                      fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'NexSkills Hub v1.0.0',
+                  style: TextStyle(color: Colors.white12, fontSize: 10),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
       ],
@@ -480,51 +505,136 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final c = context.colors;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: c.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72, height: 72,
-              decoration: BoxDecoration(
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: c.card,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: c.border, width: 0.5),
+            boxShadow: [
+              BoxShadow(
                 color: NexColors.primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(18),
+                blurRadius: 40,
+                offset: const Offset(0, 12),
               ),
-              child: const Center(
-                  child: Text('🚀', style: TextStyle(fontSize: 38))),
-            ),
-            const SizedBox(height: 16),
-            Text('NexSkills Hub',
-                style: TextStyle(color: c.textPrimary, fontSize: 20,
-                    fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text('Version 1.0.0',
-                style: TextStyle(color: c.textMuted, fontSize: 13)),
-            const SizedBox(height: 12),
-            Text(
-              'Your daily tech career journey.\nMaster AI, Cybersecurity, No-Code,\nData & Cloud — 10 minutes a day.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.5),
-            ),
-            const SizedBox(height: 16),
-            Divider(color: c.border),
-            const SizedBox(height: 8),
-            Text('by chAs Tech Group',
-                style: TextStyle(color: c.textMuted, fontSize: 12,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text('Built with ❤️ for lifelong learners',
-                style: TextStyle(color: c.textMuted, fontSize: 11)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // App icon — uses actual asset, falls back to branded icon
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/images/app_icon.png',
+                  width: 84, height: 84,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 84, height: 84,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [NexColors.primary, NexColors.accent],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.school_rounded,
+                          color: Colors.white, size: 44),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('NexSkills Hub',
+                  style: TextStyle(
+                      color: c.textPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: NexColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('Version 1.0.0',
+                    style: TextStyle(
+                        color: NexColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Your daily tech career journey. Master AI, Cybersecurity, '
+                'No-Code, Data & Cloud — just 10 minutes a day. '
+                'Structured learning paths, curated content from top creators, '
+                'and progress tracking built for busy people.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.6),
+              ),
+              const SizedBox(height: 20),
+              Divider(color: c.border, height: 1),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [NexColors.primary, NexColors.accent],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(
+                      child: Text('cA', style: TextStyle(
+                          color: Colors.white, fontSize: 13,
+                          fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('chAs Technologies LLC',
+                          style: TextStyle(
+                              color: c.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700)),
+                      Text('Built with ❤️ for lifelong learners',
+                          style: TextStyle(color: c.textMuted, fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    backgroundColor: NexColors.primary.withOpacity(0.08),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Close',
+                      style: TextStyle(
+                          color: NexColors.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

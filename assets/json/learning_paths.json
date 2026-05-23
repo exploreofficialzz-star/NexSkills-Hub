@@ -37,12 +37,12 @@
         },
         {
           "order": 4,
-          "title": "ChatGPT & Prompt Engineering Guide",
-          "type": "article",
-          "url": "https://www.promptingguide.ai/introduction/basics",
-          "duration": "10 min read",
-          "source": "Prompting Guide",
-          "note": "Read this after the videos — practical walkthrough."
+          "title": "ChatGPT & Prompt Engineering Explained",
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=1bUy-1hGZpI",
+          "duration": "10 min",
+          "source": "IBM Technology",
+          "note": "Master the art of talking to AI — prompts that actually work."
         },
         {
           "order": 5,
@@ -56,11 +56,11 @@
         {
           "order": 6,
           "title": "Top Prompt Engineering Techniques",
-          "type": "article",
-          "url": "https://www.promptingguide.ai/techniques",
-          "duration": "8 min read",
-          "source": "Prompting Guide",
-          "note": "Bookmark this. You'll come back to it often."
+          "type": "video",
+          "url": "https://www.youtube.com/watch?v=jC4v5AS4RIM",
+          "duration": "8 min",
+          "source": "Fireship",
+          "note": "Chain-of-thought, few-shot, role prompting — all explained fast."
         },
         {
           "order": 7,
@@ -478,7 +478,7 @@
         },
         {
           "order": 6,
-          "title": "Start Your First Data Project",
+          "title": "Start Your First Data Project on Kaggle",
           "type": "article",
           "url": "https://www.kaggle.com/learn",
           "duration": "15 min read",

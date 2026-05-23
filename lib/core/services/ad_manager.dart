@@ -33,45 +33,35 @@ class AdManager {
   AdManager._();
   static final AdManager instance = AdManager._();
 
-  // ── Test IDs (Google's official test units — safe in debug mode) ──
+  // ── Test IDs (Google's official test units) ───────────────────
   static const _testInterstitialId = 'ca-app-pub-3940256099942544/1033173712';
   static const _testRewardedId     = 'ca-app-pub-3940256099942544/5224354917';
   static const _testBannerId       = 'ca-app-pub-3940256099942544/6300978111';
   static const _testRewardedIntId  = 'ca-app-pub-3940256099942544/5354046379';
   static const _testNativeId       = 'ca-app-pub-3940256099942544/2247696110';
 
-  // ── Production IDs — read from AdConstants (same source as AdService) ────
-  // Debug  → test IDs (always loads; never real revenue)
-  // Release → AdConstants real IDs (your AdMob account)
-  String get _interstitialId => kDebugMode
-      ? _testInterstitialId
-      : Platform.isIOS
-          ? AdConstants.iosInterstitialId
-          : AdConstants.androidInterstitialId;
+  // ── Test-mode switch ──────────────────────────────────────────
+  // Set to false when your AdMob account is fully approved and
+  // you are ready to serve live ads to real users.
+  static const _useTestIds = true;
 
-  String get _rewardedId => kDebugMode
-      ? _testRewardedId
-      : Platform.isIOS
-          ? AdConstants.iosRewardedId
-          : AdConstants.androidRewardedId;
+  // ── ID getters ─────────────────────────────────────────────────
+  // _useTestIds=true  → test IDs (loads in any build, no revenue)
+  // _useTestIds=false → AdConstants real IDs (production revenue)
+  String get _interstitialId => _useTestIds ? _testInterstitialId
+      : Platform.isIOS ? AdConstants.iosInterstitialId : AdConstants.androidInterstitialId;
 
-  String get _bannerId => kDebugMode
-      ? _testBannerId
-      : Platform.isIOS
-          ? AdConstants.iosBannerId
-          : AdConstants.androidBannerId;
+  String get _rewardedId => _useTestIds ? _testRewardedId
+      : Platform.isIOS ? AdConstants.iosRewardedId : AdConstants.androidRewardedId;
 
-  String get _rewardedIntId => kDebugMode
-      ? _testRewardedIntId
-      : Platform.isIOS
-          ? AdConstants.iosRewardedInterstitialId
-          : AdConstants.androidRewardedInterstitialId;
+  String get _bannerId => _useTestIds ? _testBannerId
+      : Platform.isIOS ? AdConstants.iosBannerId : AdConstants.androidBannerId;
 
-  String get _nativeId => kDebugMode
-      ? _testNativeId
-      : Platform.isIOS
-          ? AdConstants.iosNativeId
-          : AdConstants.androidNativeId;
+  String get _rewardedIntId => _useTestIds ? _testRewardedIntId
+      : Platform.isIOS ? AdConstants.iosRewardedInterstitialId : AdConstants.androidRewardedInterstitialId;
+
+  String get _nativeId => _useTestIds ? _testNativeId
+      : Platform.isIOS ? AdConstants.iosNativeId : AdConstants.androidNativeId;
 
   String get nativeAdUnitId => _nativeId;
 
