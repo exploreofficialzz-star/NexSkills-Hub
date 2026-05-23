@@ -433,28 +433,29 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         ),
         // ── chAs Technologies LLC footer ──────────────────────
-        const SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, 120),
-            child: Column(
-              children: [
-                Divider(color: Colors.white12, height: 1),
-                SizedBox(height: 16),
-                Text(
-                  'Made with ❤️ by chAs Technologies LLC',
-                  style: TextStyle(color: Colors.white24, fontSize: 11,
-                      fontWeight: FontWeight.w500),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'NexSkills Hub v1.0.0',
-                  style: TextStyle(color: Colors.white12, fontSize: 10),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 8),
-              ],
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+          child: Column(
+            children: [
+              Divider(color: Colors.white.withOpacity(0.12), height: 1),
+              const SizedBox(height: 14),
+              Text(
+                'Made with ❤️ by chAs Technologies LLC',
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.22),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'NexSkills Hub v1.0.0',
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.12), fontSize: 10),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
         ),
       ],
