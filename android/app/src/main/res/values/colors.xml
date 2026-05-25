@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      NexSkills Hub launcher icon background.
+      Matches NexColors.primary = Color(0xFF6C63FF) — the exact blue from the app.
+      The foreground layer (@drawable/ic_launcher_foreground) is a white N
+      on a fully transparent background so the blue shows through directly.
+    -->
+    <color name="ic_launcher_background">#FF6C63FF</color>
+</resources>

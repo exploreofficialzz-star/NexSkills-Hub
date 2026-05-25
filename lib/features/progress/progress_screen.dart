@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/app_icon_widget.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/resource_model.dart';
 import '../../core/models/user_progress.dart';
@@ -526,29 +527,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // App icon — uses actual asset, falls back to branded icon
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  'assets/images/app_icon.png',
-                  width: 84, height: 84,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 84, height: 84,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [NexColors.primary, NexColors.accent],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.school_rounded,
-                          color: Colors.white, size: 44),
-                    ),
-                  ),
-                ),
-              ),
+              // App icon widget — matches launcher icon exactly
+              const AppIconWidget(size: 84),
               const SizedBox(height: 18),
               Text('NexSkills Hub',
                   style: TextStyle(
