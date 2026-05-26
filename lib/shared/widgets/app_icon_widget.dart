@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
 
-/// NexSkills Hub app icon displayed inside the app.
-/// Uses the exact PNG asset as uploaded — no modifications.
-/// For launcher icon: run `flutter pub run flutter_launcher_icons` after adding files.
+/// NexSkills Hub app icon.
+/// Displays the exact PNG asset — no white, no background, no clipping.
+/// The icon's transparent areas let the parent background show through.
 class AppIconWidget extends StatelessWidget {
   final double size;
   const AppIconWidget({super.key, this.size = 72});
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(size * 0.22),
-      child: Image.asset(
-        'assets/images/app_icon.png',
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-      ),
+    return Image.asset(
+      'assets/images/app_icon.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
     );
   }
 }

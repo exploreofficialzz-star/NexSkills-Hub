@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/app_icon_widget.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/user_progress.dart';
 import '../../core/services/hive_service.dart';
@@ -90,6 +91,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Column(
         children: [
+          const AppIconWidget(size: 48),
+          const SizedBox(height: 8),
           Text(
             'NexSkills Hub',
             style: TextStyle(
