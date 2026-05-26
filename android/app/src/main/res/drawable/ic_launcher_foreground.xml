@@ -1,41 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  NexSkills Hub adaptive icon — foreground layer.
-  Canvas 108x108dp  |  Safe zone 72x72dp (centred at 54,54).
-
-  Design:
-    • Circle ring  — white stroke, transparent fill (blue background shows through)
-    • N letter     — white, centred inside the ring
-    No dark inner circle. Blue comes from @color/ic_launcher_background.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Transparent circle ring (white outline only, NO fill) -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3.5"
-        android:pathData="
-            M54,18
-            A36,36 0 1 1 53.999,18
-            Z" />
-
-    <!-- White bold N — scaled to sit inside the ring -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="
-            M28,30
-            L40,30
-            L62,74
-            L80,74
-            L80,30
-            L68,30
-            L46,74
-            L28,74
-            Z" />
-
+    <!-- White circle -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M24,54 A30,30 0 0 1 84,54 A30,30 0 0 1 24,54 Z"/>
+    <!-- Purple N -->
+    <path android:fillColor="#6C63FF"
+        android:pathData="M35,34 L46,34 L65,74 L73,74 L73,34 L62,34 L43,74 L35,74 Z"/>
 </vector>
