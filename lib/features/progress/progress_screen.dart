@@ -528,8 +528,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // App icon widget — matches launcher icon exactly
-              const AppIconWidget(size: 84),
-              const SizedBox(height: 18),
+              const AppIconWidget(size: 110),
+              const SizedBox(height: 8),
               Text('NexSkills Hub',
                   style: TextStyle(
                       color: c.textPrimary,
@@ -561,38 +561,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
               const SizedBox(height: 20),
               Divider(color: c.border, height: 1),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Column(
                 children: [
-                  Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [NexColors.primary, NexColors.accent],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(
-                      child: Text('cA', style: TextStyle(
-                          color: Colors.white, fontSize: 13,
-                          fontWeight: FontWeight.w800)),
-                    ),
+                  // chAs Technologies LLC actual logo
+                  Image.asset(
+                    'assets/images/chas_logo.png',
+                    height: 36,
+                    fit: BoxFit.contain,
                   ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('chAs Technologies LLC',
-                          style: TextStyle(
-                              color: c.textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700)),
-                      Text('Built with ❤️ for lifelong learners',
-                          style: TextStyle(color: c.textMuted, fontSize: 11)),
-                    ],
-                  ),
+                  const SizedBox(height: 6),
+                  Text('Built with ❤️ for lifelong learners',
+                      style: TextStyle(color: c.textMuted, fontSize: 11)),
                 ],
               ),
               const SizedBox(height: 20),

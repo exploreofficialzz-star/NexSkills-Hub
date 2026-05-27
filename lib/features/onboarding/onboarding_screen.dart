@@ -88,21 +88,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildHeader(NexColors c) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppIconWidget(size: 48),
-          const SizedBox(height: 8),
-          Text(
-            'NexSkills Hub',
-            style: TextStyle(
-              color: c.textMuted,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-            ),
+          // Icon left-aligned, large, with app name beside it
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const AppIconWidget(size: 72),
+              const SizedBox(width: 14),
+              Text(
+                'NexSkills Hub',
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: List.generate(
               3,
