@@ -1,18 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- NexSkills Hub launcher icon foreground.
-     N letter only on fully transparent background.
-     No white. No circle fill. Blue background comes from @color/ic_launcher_background.
-     The circular "ring" is created by the flutter_launcher_icons tool
-     clipping the source PNG (app_icon.png) which already has the correct shape. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-
-    <!-- N only — same purple as background creates subtle depth; white shows as foreground -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M30,25 L43,25 L67,83 L78,83 L78,25 L65,25 L41,83 L30,83 Z"/>
-
-</vector>
+<!-- Foreground = original icon PNG bitmap. No vector, no generated shape. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_launcher_fg"
+    android:gravity="center"
+    android:tileMode="disabled"/>
