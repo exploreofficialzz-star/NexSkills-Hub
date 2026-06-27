@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// NexSkills Hub app icon.
-/// Displays the exact PNG asset — no white, no background, no clipping.
-/// The icon's transparent areas let the parent background show through.
+/// NexSkills Hub app icon — exact PNG asset, no modifications.
 class AppIconWidget extends StatelessWidget {
   final double size;
   const AppIconWidget({super.key, this.size = 72});
