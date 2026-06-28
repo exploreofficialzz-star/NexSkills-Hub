@@ -22,8 +22,6 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          # 3.27+ required: youtube_player_flutter 9.1.x uses Color.withValues()
-          # which was added in Flutter 3.27.0. CardThemeData also requires 3.26+.
           flutter-version: '3.27.4'
           channel: 'stable'
           cache: true
@@ -55,9 +53,9 @@ jobs:
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         run: flutter build appbundle --release
 
-      - name: Build APK (release)
+      - name: Build Universal APK (release)
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release
 
       - name: Upload AAB artifact
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
@@ -67,12 +65,12 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
 
-      - name: Upload APKs artifact
+      - name: Upload Universal APK artifact
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
-          name: nexskills-release-apks
-          path: build/app/outputs/flutter-apk/*.apk
+          name: nexskills-release-universal-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
       - name: Create GitHub Release
@@ -81,7 +79,7 @@ jobs:
         with:
           files: |
             build/app/outputs/bundle/release/app-release.aab
-            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/flutter-apk/app-release.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
