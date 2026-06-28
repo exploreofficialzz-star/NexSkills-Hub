@@ -4,9 +4,9 @@ import 'core/services/hive_service.dart';
 import 'core/services/ad_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/connectivity_service.dart';
-import 'core/services/content_health_service.dart';
 import 'shared/theme.dart';
 import 'shared/network_aware_wrapper.dart';
+import 'shared/widgets/app_icon_widget.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/home/home_screen.dart';
 
@@ -18,32 +18,15 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Only Hive before runApp — everything else runs inside SplashScreen
+  // so the first Flutter frame (the splash) paints instantly.
   await HiveService.init();
 
-  // Initialize AdMob SDK only — do NOT preload ads here (Section 5.1 / 1.6).
-  // Ads are preloaded after the first frame renders, inside HomeScreen.
-  await Future.wait([
-    AdService.initializeSdkOnly(), // SDK init, no ad loading
-    ConnectivityService.instance.init(),
-  ]);
-  try {
-    await NotificationService.init();
-  } catch (_) {}
-
-  final progress = HiveService.getProgress();
-
-  final isOnboarded = progress.activeCategory.isNotEmpty &&
-      (progress.lastActiveDate != null ||
-          progress.totalXP > 0 ||
-          progress.totalLessonsCompleted > 0 ||
-          progress.dailyGoalMinutes != 20);
-
-  runApp(NexSkillsApp(isOnboarded: isOnboarded));
+  runApp(const NexSkillsApp());
 }
 
 class NexSkillsApp extends StatefulWidget {
-  final bool isOnboarded;
-  const NexSkillsApp({super.key, required this.isOnboarded});
+  const NexSkillsApp({super.key});
 
   @override
   State<NexSkillsApp> createState() => _NexSkillsAppState();
@@ -106,15 +89,132 @@ class _NexSkillsAppState extends State<NexSkillsApp>
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _themeMode,
-      // Global error boundary — catches Flutter rendering exceptions and
-      // shows a user-friendly fallback instead of the red error box.
       builder: (context, child) {
         return _GlobalErrorBoundary(child: child ?? const SizedBox.shrink());
       },
       home: NetworkAwareWrapper(
-        child: widget.isOnboarded
-            ? HomeScreen(onThemeModeChanged: setThemeMode)
-            : const OnboardingScreen(),
+        child: SplashScreen(onThemeModeChanged: setThemeMode),
+      ),
+    );
+  }
+}
+
+// ─── Splash Screen ────────────────────────────────────────────────────────────
+// Shows the app icon immediately (first Flutter frame).
+// Runs remaining async init in the background, then fades into home/onboarding.
+class SplashScreen extends StatefulWidget {
+  final void Function(ThemeMode)? onThemeModeChanged;
+  const SplashScreen({super.key, this.onThemeModeChanged});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _fadeCtrl;
+  late Animation<double> _fadeIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
+    _fadeIn = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+
+    // Init runs after first frame so splash paints before any blocking work.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _init());
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _init() async {
+    // Run heavy init concurrently with a minimum display time
+    // so the splash is never just a flash.
+    await Future.wait([
+      _runServices(),
+      Future.delayed(const Duration(milliseconds: 1800)),
+    ]);
+    if (!mounted) return;
+    _navigate();
+  }
+
+  Future<void> _runServices() async {
+    await Future.wait([
+      AdService.initializeSdkOnly(),
+      ConnectivityService.instance.init(),
+    ]);
+    try {
+      await NotificationService.init();
+    } catch (_) {}
+  }
+
+  void _navigate() {
+    final isOnboarded = HiveService.hasCompletedOnboarding();
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 500),
+        pageBuilder: (_, animation, __) => FadeTransition(
+          opacity: animation,
+          child: isOnboarded
+              ? HomeScreen(onThemeModeChanged: widget.onThemeModeChanged)
+              : OnboardingScreen(onThemeModeChanged: widget.onThemeModeChanged),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      // Always dark navy — matches launch_background.xml exactly,
+      // so there is zero colour flash between the native and Flutter splash.
+      backgroundColor: const Color(0xFF020C26),
+      body: FadeTransition(
+        opacity: _fadeIn,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // App icon
+              const AppIconWidget(size: 110),
+              const SizedBox(height: 22),
+              // App name
+              const Text(
+                'NexSkills Hub',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Your tech learning companion',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.45),
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 52),
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: Color(0xFF6C63FF),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -135,7 +235,6 @@ class _GlobalErrorBoundaryState extends State<_GlobalErrorBoundary> {
   @override
   void initState() {
     super.initState();
-    // Catch uncaught Flutter errors globally
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
       if (mounted) setState(() => _error = details.exception);

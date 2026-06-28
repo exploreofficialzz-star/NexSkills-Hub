@@ -4,14 +4,15 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/resource_model.dart';
 import '../../core/services/hive_service.dart';
+import '../../shared/widgets/app_icon_widget.dart';
 
-/// Full in-app YouTube player — no redirect to the YouTube app.
-/// Uses youtube_player_flutter (already in pubspec) with:
-///   • Auto-play on open
-///   • Progress bar in brand colour
-///   • Full-screen support (landscape lock)
-///   • Title + description below the player
-///   • Marks resource as consumed on open
+/// Full in-app YouTube player.
+///
+/// Fix for "hang on open":
+///   _initPlayer() is deferred to the first post-frame callback so the
+///   screen paints a proper loading UI BEFORE the YoutubePlayerController
+///   creates its internal WebView (which can take 2–5 s on first launch).
+///   A loading overlay stays visible until onReady fires.
 class VideoPlayerScreen extends StatefulWidget {
   final ResourceModel resource;
   const VideoPlayerScreen({super.key, required this.resource});
@@ -23,35 +24,40 @@ class VideoPlayerScreen extends StatefulWidget {
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   YoutubePlayerController? _controller;
   bool _isFullScreen = false;
+  bool _playerReady  = false; // true once onReady fires
   String? _errorMsg;
 
   @override
   void initState() {
     super.initState();
-    _initPlayer();
-    // Mark as consumed immediately on open
+    // Mark consumed immediately — before the player even loads.
     HiveService.markConsumed(widget.resource.id);
     HiveService.markRead(widget.resource.id);
+    // Defer heavy WebView creation to after the first frame renders.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initPlayer());
   }
 
   void _initPlayer() {
+    if (!mounted) return;
     final videoId = YoutubePlayer.convertUrlToId(widget.resource.url);
     if (videoId == null || videoId.isEmpty) {
       setState(() => _errorMsg = 'Could not load video. Invalid YouTube URL.');
       return;
     }
-    _controller = YoutubePlayerController(
-      initialVideoId: videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-        enableCaption: true,
-        captionLanguage: 'en',
-        forceHD: false,
-        loop: false,
-        isLive: false,
-      ),
-    )..addListener(_onPlayerStateChange);
+    setState(() {
+      _controller = YoutubePlayerController(
+        initialVideoId: videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: true,
+          mute: false,
+          enableCaption: true,
+          captionLanguage: 'en',
+          forceHD: false,
+          loop: false,
+          isLive: false,
+        ),
+      )..addListener(_onPlayerStateChange);
+    });
   }
 
   void _onPlayerStateChange() {
@@ -72,44 +78,75 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void dispose() {
     _controller?.removeListener(_onPlayerStateChange);
     _controller?.dispose();
-    // Always restore portrait on exit
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
+  }
+
+  // ─── Loading state (shown before _initPlayer completes) ──────────────────
+  Widget _buildLoading(NexColors c) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: BackButton(color: Colors.white70),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppIconWidget(size: 72),
+            const SizedBox(height: 28),
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: NexColors.primary,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Loading video…',
+              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Error state ──────────────────────────────────────────────────────────
+  Widget _buildError(NexColors c) {
+    return Scaffold(
+      backgroundColor: c.background,
+      appBar: AppBar(backgroundColor: c.background),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('😕', style: TextStyle(fontSize: 48)),
+              const SizedBox(height: 16),
+              Text(
+                _errorMsg!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.textMuted, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
 
-    if (_errorMsg != null) {
-      return Scaffold(
-        backgroundColor: c.background,
-        appBar: AppBar(backgroundColor: c.background),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('😕', style: TextStyle(fontSize: 48)),
-                const SizedBox(height: 16),
-                Text(_errorMsg!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: c.textMuted, fontSize: 14)),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_controller == null) {
-      return Scaffold(
-        backgroundColor: c.background,
-        body: Center(
-            child: CircularProgressIndicator(color: NexColors.primary)),
-      );
-    }
+    if (_errorMsg != null) return _buildError(c);
+    if (_controller == null) return _buildLoading(c);
 
     return YoutubePlayerBuilder(
       onExitFullScreen: () {
@@ -120,9 +157,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         showVideoProgressIndicator: true,
         progressIndicatorColor: NexColors.primary,
         progressColors: const ProgressBarColors(
-          playedColor: NexColors.primary,
-          handleColor: NexColors.accent,
-          bufferedColor: Colors.white24,
+          playedColor:    NexColors.primary,
+          handleColor:    NexColors.accent,
+          bufferedColor:  Colors.white24,
           backgroundColor: Colors.white12,
         ),
         topActions: [
@@ -131,15 +168,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             child: Text(
               widget.resource.title,
               style: const TextStyle(
-                  color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
-        onReady: () => _controller!.play(),
-        onEnded: (_) {
-          // Optionally loop or show next
+        onReady: () {
+          // onReady fires when the WebView is fully initialised.
+          // Remove the loading overlay and start playback.
+          if (mounted) setState(() => _playerReady = true);
+          _controller!.play();
         },
+        onEnded: (_) {},
       ),
       builder: (context, player) => Scaffold(
         backgroundColor: c.background,
@@ -151,7 +193,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 leading: BackButton(color: c.textPrimary),
                 title: Text(
                   widget.resource.sourceName,
-                  style: TextStyle(
+                  style: const TextStyle(
                       color: NexColors.primary,
                       fontSize: 14,
                       fontWeight: FontWeight.w700),
@@ -160,17 +202,36 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   IconButton(
                     icon: Icon(Icons.open_in_new, color: c.textMuted, size: 20),
                     tooltip: 'Open in YouTube',
-                    onPressed: () async {
-                      // Fallback: open in YouTube if user wants
-                    },
+                    onPressed: () {},
                   ),
                 ],
               ),
         body: Column(
           children: [
-            // Video player (full-width, 16:9)
-            player,
-            // Scrollable content below
+            // ── Player + loading overlay ────────────────────────────────
+            Stack(
+              children: [
+                player, // 16:9 WebView
+                // Overlay covers the black WebView flash until onReady fires.
+                if (!_playerReady)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black,
+                      child: const Center(
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: NexColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            // ── Scrollable content below ────────────────────────────────
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
@@ -178,7 +239,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Source chip
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
@@ -186,14 +246,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         color: NexColors.accent.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text('🎬 ${widget.resource.sourceName}',
-                          style: const TextStyle(
-                              color: NexColors.accent,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
+                      child: Text(
+                        '🎬 ${widget.resource.sourceName}',
+                        style: const TextStyle(
+                            color: NexColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    // Title
                     Text(
                       widget.resource.title,
                       style: TextStyle(
@@ -203,29 +264,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         height: 1.35,
                       ),
                     ),
-                    // Description
                     if (widget.resource.description != null &&
                         widget.resource.description!.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       Text(
                         widget.resource.description!,
                         style: TextStyle(
-                            color: c.textSecondary, fontSize: 14, height: 1.65),
+                            color: c.textSecondary,
+                            fontSize: 14,
+                            height: 1.65),
                       ),
                     ],
                     const SizedBox(height: 24),
-                    // Category tag
                     Row(
                       children: [
                         Icon(Icons.local_offer_outlined,
                             color: c.textMuted, size: 14),
                         const SizedBox(width: 6),
-                        Text(widget.resource.category.toUpperCase(),
-                            style: TextStyle(
-                                color: c.textMuted,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5)),
+                        Text(
+                          widget.resource.category.toUpperCase(),
+                          style: TextStyle(
+                              color: c.textMuted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5),
+                        ),
                       ],
                     ),
                   ],

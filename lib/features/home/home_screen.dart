@@ -20,9 +20,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   int _currentIndex = 0;
   late AnimationController _navController;
+  // Signals ExploreScreen to refresh when the tab is selected or app resumes.
+  final _exploreRefresh = ValueNotifier<int>(0);
 
   static const _items = [
     _NavItem(icon: Icons.today_outlined,      activeIcon: Icons.today,      label: 'Today'),
@@ -34,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _navController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -71,21 +74,32 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _exploreRefresh.dispose();
     _navController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Nudge explore to refresh stale content when user returns to the app.
+      _exploreRefresh.value++;
+    }
+  }
+
   void _onTap(int i) {
     if (i == _currentIndex) return;
-    // NO interstitial on tab switch — user explicitly requested removal
     setState(() => _currentIndex = i);
     _navController.forward(from: 0);
+    // Tell explore to check for stale content every time the tab is opened.
+    if (i == 2) _exploreRefresh.value++;
   }
 
   Widget _buildScreen(int i) => switch (i) {
         0 => const TodayScreen(),
         1 => const PathsScreen(),
-        2 => const ExploreScreen(),
+        2 => ExploreScreen(refreshTrigger: _exploreRefresh),
         3 => ProgressScreen(onThemeModeChanged: widget.onThemeModeChanged),
         _ => const TodayScreen(),
       };

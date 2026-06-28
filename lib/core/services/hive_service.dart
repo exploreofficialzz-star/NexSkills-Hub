@@ -173,6 +173,18 @@ class HiveService {
     await saveProgress(p);
   }
 
+  // ─── Onboarding flag ─────────────────────────────────────────
+  static const _onboardedKey = 'onboarded';
+
+  /// Returns true only after OnboardingScreen explicitly calls [setOnboarded].
+  /// A dedicated boolean flag — not inferred from progress fields, so it
+  /// can never produce a false-negative when the user keeps default settings.
+  static bool hasCompletedOnboarding() =>
+      _settings.get(_onboardedKey) == true;
+
+  static Future<void> setOnboarded() async =>
+      _settings.put(_onboardedKey, true);
+
   // ─── Theme preference ────────────────────────────────────────
   static Box get _settings => Hive.box(_settingsBox);
 

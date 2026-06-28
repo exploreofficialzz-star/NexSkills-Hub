@@ -13,7 +13,10 @@ import 'video_player_screen.dart';
 import 'resource_viewer_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  /// Incremented by HomeScreen when the explore tab is selected or the app
+  /// resumes — ExploreScreen refreshes if content is older than 5 minutes.
+  final ValueNotifier<int>? refreshTrigger;
+  const ExploreScreen({super.key, this.refreshTrigger});
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
@@ -29,6 +32,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   String? _error;
   BannerAd? _bottomBanner;
   bool _bottomBannerLoaded = false;
+  DateTime? _lastFetchTime; // tracks content freshness
 
 
   static const _categories = [
@@ -56,13 +60,27 @@ class _ExploreScreenState extends State<ExploreScreen>
     _loadFromCache();
     _fetchFresh();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadBottomBanner());
-    // Sticky banner removed — it overlapped the floating nav bar.
+    // Listen for tab-return / app-resume signals from HomeScreen.
+    widget.refreshTrigger?.addListener(_onRefreshTriggered);
   }
 
   @override
   void dispose() {
+    widget.refreshTrigger?.removeListener(_onRefreshTriggered);
     _bottomBanner?.dispose();
     super.dispose();
+  }
+
+  /// Called when HomeScreen signals a potential refresh (tab tap or app resume).
+  /// Only actually fetches if content is older than 5 minutes.
+  void _onRefreshTriggered() => _refreshIfStale();
+
+  void _refreshIfStale() {
+    if (_refreshing) return;
+    final stale = _lastFetchTime == null ||
+        DateTime.now().difference(_lastFetchTime!) >
+            const Duration(minutes: 5);
+    if (stale) _fetchFresh();
   }
 
 
@@ -158,9 +176,13 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (mounted) setState(() { _refreshing = true; _error = null; });
     try {
       await RssService.fetchAll();
+      _lastFetchTime = DateTime.now();  // stamp successful fetch
       _consumedIds = HiveService.getAllConsumedIds();
       _loadFromCache();
     } catch (e) {
+      // Still reload cache so user sees whatever is stored, not a blank screen.
+      _consumedIds = HiveService.getAllConsumedIds();
+      _loadFromCache();
       if (mounted) setState(() => _error = 'Could not fetch. Check your connection.');
     } finally {
       if (mounted) setState(() { _refreshing = false; _loading = false; });

@@ -7,7 +7,8 @@ import '../../core/services/notification_service.dart';
 import '../home/home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  final void Function(ThemeMode)? onThemeModeChanged;
+  const OnboardingScreen({super.key, this.onThemeModeChanged});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -42,6 +43,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       dailyGoalMinutes: _dailyGoalMinutes,
     );
     await HiveService.saveProgress(progress);
+    // Dedicated flag — no longer inferred from progress fields.
+    await HiveService.setOnboarded();
 
     // Notifications are best-effort — never block navigation
     try {
@@ -51,7 +54,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     if (mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 500),
+          pageBuilder: (_, animation, __) => FadeTransition(
+            opacity: animation,
+            child: HomeScreen(onThemeModeChanged: widget.onThemeModeChanged),
+          ),
+        ),
       );
     }
   }
