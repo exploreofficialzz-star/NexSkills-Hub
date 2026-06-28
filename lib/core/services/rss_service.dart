@@ -27,6 +27,10 @@ class RssService {
 
     await HiveService.saveResources(flat);
 
+    // Keep Hive box from growing unboundedly.
+    // 150 items per category = ~750 total max, all recent.
+    await HiveService.trimCategory(category, keep: 150);
+
     // Fire new-content notification for this category if there are new items
     if (newCount > 0) {
       try {
@@ -153,11 +157,10 @@ class RssService {
         // Thumbnail priority:
         // 1. RSS enclosure (podcast / media)
         // 2. <img> inside content:encoded or description HTML
-        // 3. Clearbit Logo API — always gives a recognisable brand image
+        // 3. null → _GradientPlaceholder shown in the UI (looks better than Clearbit logos)
         String? thumbnail = item.enclosure?.url;
         thumbnail ??= _extractImg(item.content?.value ?? '');
         thumbnail ??= _extractImg(item.description ?? '');
-        thumbnail ??= _clearbitLogo(link); // ← fallback thumbnail for articles
 
         items.add(ResourceModel(
           id: item.guid ?? link,
@@ -196,24 +199,21 @@ class RssService {
       .replaceAll('&apos;', "'")
       .replaceAll('&nbsp;', ' ');
 
-  /// Clearbit Logo API — returns a brand logo URL for any domain.
-  /// Free, reliable, and always returns an image for known brands.
-  static String? _clearbitLogo(String articleUrl) {
-    try {
-      final host = Uri.parse(articleUrl).host.replaceAll('www.', '');
-      if (host.isEmpty) return null;
-      return 'https://logo.clearbit.com/$host';
-    } catch (_) {
-      return null;
-    }
-  }
-
   static String? _extractImg(String html) {
     if (html.isEmpty) return null;
-    final m = RegExp(r'<img[^>]+src="(https?://[^"]+)"', caseSensitive: false)
-        .firstMatch(html);
+    // Accept both double- and single-quoted src attributes
+    final m = RegExp(
+      r'''<img[^>]+src=["'](https?://[^"'\s>]+)["']''',
+      caseSensitive: false,
+    ).firstMatch(html);
     final src = m?.group(1);
-    return (src == null || src.startsWith('data:')) ? null : src;
+    if (src == null || src.startsWith('data:')) return null;
+    // Skip common 1×1 tracking pixels
+    if (src.contains('1x1') ||
+        src.contains('pixel') ||
+        src.contains('tracking') ||
+        src.contains('beacon')) return null;
+    return src;
   }
 
   static DateTime _parseDate(String? raw) {

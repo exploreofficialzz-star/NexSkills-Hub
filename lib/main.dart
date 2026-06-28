@@ -110,33 +110,15 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _fadeCtrl;
-  late Animation<double> _fadeIn;
-
+class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _fadeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    )..forward();
-    _fadeIn = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
-
-    // Init runs after first frame so splash paints before any blocking work.
+    // Init after first frame — splash renders first, then services load.
     WidgetsBinding.instance.addPostFrameCallback((_) => _init());
   }
 
-  @override
-  void dispose() {
-    _fadeCtrl.dispose();
-    super.dispose();
-  }
-
   Future<void> _init() async {
-    // Run heavy init concurrently with a minimum display time
-    // so the splash is never just a flash.
     await Future.wait([
       _runServices(),
       Future.delayed(const Duration(milliseconds: 1800)),
@@ -159,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen>
     final isOnboarded = HiveService.hasCompletedOnboarding();
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 500),
+        transitionDuration: const Duration(milliseconds: 400),
         pageBuilder: (_, animation, __) => FadeTransition(
           opacity: animation,
           child: isOnboarded
@@ -172,50 +154,118 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Match whatever the rest of the app uses — no hardcoded colour.
+    final bg     = Theme.of(context).scaffoldBackgroundColor;
+    final fg     = isDark ? Colors.white        : Colors.black87;
+    final muted  = isDark ? Colors.white38      : Colors.black38;
+
     return Scaffold(
-      // Always dark navy — matches launch_background.xml exactly,
-      // so there is zero colour flash between the native and Flutter splash.
-      backgroundColor: const Color(0xFF020C26),
-      body: FadeTransition(
-        opacity: _fadeIn,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // App icon
-              const AppIconWidget(size: 110),
-              const SizedBox(height: 22),
-              // App name
-              const Text(
-                'NexSkills Hub',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
+      backgroundColor: bg,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Icon — clipped so PNG corner artefacts are invisible ──
+            ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: const AppIconWidget(size: 112),
+            ),
+            const SizedBox(height: 24),
+            // ── App name ──────────────────────────────────────────────
+            Text(
+              'NexSkills Hub',
+              style: TextStyle(
+                color: fg,
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Your tech learning companion',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.45),
-                  fontSize: 14,
-                ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Your tech learning companion',
+              style: TextStyle(color: muted, fontSize: 14),
+            ),
+            const SizedBox(height: 48),
+            // ── Three-dot bouncing loader ─────────────────────────────
+            const _DotsLoader(),
+            const SizedBox(height: 20),
+            // ── Brand attribution ─────────────────────────────────────
+            Text(
+              'by chAs',
+              style: TextStyle(
+                color: muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.5,
               ),
-              const SizedBox(height: 52),
-              const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: Color(0xFF6C63FF),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Three-dot bouncing loader ────────────────────────────────────────────────
+class _DotsLoader extends StatefulWidget {
+  const _DotsLoader();
+  @override
+  State<_DotsLoader> createState() => _DotsLoaderState();
+}
+
+class _DotsLoaderState extends State<_DotsLoader>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            // Each dot is offset by 1/3 of the cycle
+            final phase = ((_ctrl.value - i / 3.0) % 1.0 + 1.0) % 1.0;
+            // Bounce only in the first half of each dot's phase window
+            final bounce = phase < 0.4
+                ? -(phase < 0.2
+                    ? (phase / 0.2)
+                    : (0.4 - phase) / 0.2) *
+                    10.0
+                : 0.0;
+            return Transform.translate(
+              offset: Offset(0, bounce),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                width: 9,
+                height: 9,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF6C63FF),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

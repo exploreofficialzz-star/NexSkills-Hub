@@ -21,9 +21,10 @@ class AppSources {
 
     // ══════════════════════════════════════════════════════════
     // AI
+    // Each channel appears in EXACTLY ONE category to prevent
+    // Hive key collisions (id = 'yt:video:$videoId' is global).
     // ══════════════════════════════════════════════════════════
 
-    // YouTube — channel IDs verified against public channel pages
     ContentSource(
       name: 'Fireship',
       type: SourceType.youtube,
@@ -48,12 +49,17 @@ class AppSources {
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCKWaEZ-_VweaEx1j62do_vQ',
       category: 'ai', icon: '🤖',
     ),
+    ContentSource(
+      name: 'Lex Fridman',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCSHZKyawb77ixDdsGog4iWA',
+      category: 'ai', icon: '🤖',
+    ),
 
-    // Blogs — confirmed working RSS endpoints
     ContentSource(
       name: 'OpenAI Blog',
       type: SourceType.blog,
-      feedUrl: 'https://openai.com/blog/rss.xml',    // /blog/rss.xml is more stable
+      feedUrl: 'https://openai.com/blog/rss.xml',
       category: 'ai', icon: '📝',
     ),
     ContentSource(
@@ -74,7 +80,6 @@ class AppSources {
       feedUrl: 'https://www.deeplearning.ai/the-batch/feed/',
       category: 'ai', icon: '📝',
     ),
-    // NOTE: Towards Data Science removed — Medium paywall blocks RSS
 
     // ══════════════════════════════════════════════════════════
     // CYBERSECURITY
@@ -87,9 +92,15 @@ class AppSources {
       category: 'cybersecurity', icon: '🔐',
     ),
     ContentSource(
-      name: 'Fireship',
+      name: 'John Hammond',
       type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA',
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCVeW9qkBjo3zosnqUbG7CFw',
+      category: 'cybersecurity', icon: '🔐',
+    ),
+    ContentSource(
+      name: 'David Bombal',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCP7WmQ_U4GB3K51Od9QvM0w',
       category: 'cybersecurity', icon: '🔐',
     ),
 
@@ -119,19 +130,19 @@ class AppSources {
     ),
 
     // ══════════════════════════════════════════════════════════
-    // NO-CODE
+    // NO-CODE / WEB
     // ══════════════════════════════════════════════════════════
 
-    ContentSource(
-      name: 'Fireship',
-      type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA',
-      category: 'nocode', icon: '⚡',
-    ),
     ContentSource(
       name: 'Traversy Media',
       type: SourceType.youtube,
       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC29ju8bIPH5as8OGnQzwJyA',
+      category: 'nocode', icon: '⚡',
+    ),
+    ContentSource(
+      name: 'Kevin Powell',
+      type: SourceType.youtube,
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCJZv4d5rbIKd4QHMPkcABSA',
       category: 'nocode', icon: '⚡',
     ),
 
@@ -165,9 +176,9 @@ class AppSources {
       category: 'data', icon: '📊',
     ),
     ContentSource(
-      name: 'Traversy Media',
+      name: 'Tech With Tim',
       type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC29ju8bIPH5as8OGnQzwJyA',
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC4JX40jDee_tINbkjycV4Sg',
       category: 'data', icon: '📊',
     ),
 
@@ -191,7 +202,7 @@ class AppSources {
     ),
 
     // ══════════════════════════════════════════════════════════
-    // CLOUD
+    // CLOUD / DEVOPS
     // ══════════════════════════════════════════════════════════
 
     ContentSource(
@@ -201,13 +212,12 @@ class AppSources {
       category: 'cloud', icon: '☁️',
     ),
     ContentSource(
-      name: 'NetworkChuck',
+      name: 'GitHub',
       type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC9x0AN7BWHpCDHSm9NiJFJQ',
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC7c3Kb6jYCRj4JOHHZTxKsA',
       category: 'cloud', icon: '☁️',
     ),
 
-    // Confirmed working ✓
     ContentSource(
       name: 'Google Cloud Blog',
       type: SourceType.blog,

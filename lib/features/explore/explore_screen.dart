@@ -97,79 +97,21 @@ class _ExploreScreenState extends State<ExploreScreen>
         ? allCats.expand((c) => HiveService.getResourcesByCategory(c)).toList()
         : HiveService.getResourcesByCategory(_selectedCategory);
     if (mounted) setState(() {
-      _items = _sortWithConsumedAtBottom(raw);
+      _items = _sortItems(raw);
       if (raw.isNotEmpty) _loading = false;
     });
   }
 
-  /// Smart feed — interleaves content from ALL categories and mixes
-  /// videos with articles so no single source dominates.
-  ///
-  /// Algorithm:
-  ///   1. Separate unconsumed / consumed
-  ///   2. Within each group: group by category, sort each by date
-  ///   3. Round-robin across categories (ai → cyber → nocode → data → cloud)
-  ///   4. Insert a video every 3rd slot when available
-  ///   5. Consumed items sink to the bottom
-  List<ResourceModel> _sortWithConsumedAtBottom(List<ResourceModel> src) {
-    final unconsumed = src.where((r) => !_consumedIds.contains(r.id)).toList();
-    final consumed   = src.where((r) => _consumedIds.contains(r.id)).toList();
-    return [..._interleave(unconsumed), ..._interleave(consumed)];
-  }
-
-  List<ResourceModel> _interleave(List<ResourceModel> items) {
-    if (items.isEmpty) return items;
-
-    // Separate videos and articles
-    final videos   = items.where(_isVideo).toList()
+  /// Newest-first sort: unconsumed items on top (newest → oldest),
+  /// then consumed items below (newest → oldest).
+  /// Videos and articles are mixed naturally by publish date — no artificial
+  /// round-robin that could bury new content from a prolific source.
+  List<ResourceModel> _sortItems(List<ResourceModel> src) {
+    final unconsumed = src.where((r) => !_consumedIds.contains(r.id)).toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    final articles = items.where((r) => !_isVideo(r)).toList();
-
-    // Group articles by category in a fixed order for consistency
-    const catOrder = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
-    final groups = <String, List<ResourceModel>>{
-      for (final cat in catOrder) cat: [],
-    };
-    for (final r in articles) {
-      groups.putIfAbsent(r.category, () => []);
-      groups[r.category]!.add(r);
-    }
-    // Sort each group newest-first
-    for (final g in groups.values) {
-      g.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    }
-
-    final result = <ResourceModel>[];
-    final keys = groups.keys.where((k) => groups[k]!.isNotEmpty).toList();
-    int videoIdx = 0;
-    int totalAdded = 0;
-
-    bool hasMore = true;
-    while (hasMore) {
-      hasMore = false;
-      for (final key in keys) {
-        final list = groups[key]!;
-        if (list.isEmpty) continue;
-
-        // Insert a video every 3rd article slot
-        if (videoIdx < videos.length && totalAdded % 3 == 2) {
-          result.add(videos[videoIdx++]);
-          totalAdded++;
-          hasMore = true;
-        }
-
-        result.add(list.removeAt(0));
-        totalAdded++;
-        hasMore = true;
-      }
-    }
-
-    // Append remaining videos at end
-    if (videoIdx < videos.length) {
-      result.addAll(videos.sublist(videoIdx));
-    }
-
-    return result;
+    final consumed = src.where((r) => _consumedIds.contains(r.id)).toList()
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    return [...unconsumed, ...consumed];
   }
 
   Future<void> _fetchFresh() async {
@@ -229,7 +171,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     HiveService.markRead(r.id);
     if (mounted) setState(() {
       _consumedIds = HiveService.getAllConsumedIds();
-      _items = _sortWithConsumedAtBottom(_items);
+      _items = _sortItems(_items);
     });
   }
 
@@ -252,7 +194,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
     if (ok == true) {
       await HiveService.clearConsumedItems();
-      if (mounted) setState(() { _consumedIds = {}; _items = _sortWithConsumedAtBottom(_items); });
+      if (mounted) setState(() { _consumedIds = {}; _items = _sortItems(_items); });
     }
   }
 
@@ -421,7 +363,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             await HiveService.clearConsumedItems();
             if (mounted) setState(() {
               _consumedIds = {};
-              _items = _sortWithConsumedAtBottom(_items);
+              _items = _sortItems(_items);
             });
             ScaffoldMessenger.of(context)
                 .showSnackBar(const SnackBar(content: Text('History cleared')));
@@ -529,87 +471,73 @@ class _Thumbnail extends StatelessWidget {
   final bool isVideo;
   const _Thumbnail({required this.resource, required this.isVideo});
 
-  static const _catColors = {
-    'ai':            Color(0xFF6C63FF),
-    'cybersecurity': Color(0xFF00C853),
-    'nocode':        Color(0xFFFF6D00),
-    'data':          Color(0xFF0091EA),
-    'cloud':         Color(0xFF00B8D4),
-  };
-
-  static const _catIcons = {
-    'ai': '🤖', 'cybersecurity': '🔐', 'nocode': '⚡',
-    'data': '📊', 'cloud': '☁️',
-  };
+  static const _h      = 190.0;
+  static const _radius = BorderRadius.vertical(top: Radius.circular(16));
 
   @override
   Widget build(BuildContext context) {
-    // Compute effective thumbnail at render time.
-    // If stored thumbnail is null, try clearbit logo from the article URL.
-    // This handles old cached articles stored before the clearbit fallback was added.
     String? thumb = resource.thumbnail;
-    if (thumb == null && resource.url.isNotEmpty) {
-      try {
-        final host = Uri.parse(resource.url).host.replaceAll('www.', '');
-        if (host.isNotEmpty) thumb = 'https://logo.clearbit.com/$host';
-      } catch (_) {}
-    }
-    const h = 190.0;
-    final radius = const BorderRadius.vertical(top: Radius.circular(16));
-    final isClearbit = thumb != null && thumb.contains('logo.clearbit.com');
 
-    // No thumbnail at all → gradient placeholder
+    // If the only thumbnail we have is a Clearbit logo URL, discard it —
+    // brand logos are tiny/portrait and look broken at card width.
+    // The gradient placeholder is designed for this case and looks correct.
+    final isClearbit = thumb != null && thumb.contains('logo.clearbit.com');
+    if (isClearbit) thumb = null;
+
+    // No usable thumbnail → gradient
     if (thumb == null) {
       return _GradientPlaceholder(
-          category: resource.category, sourceName: resource.sourceName,
-          isVideo: isVideo, height: h, radius: radius);
+        category: resource.category,
+        sourceName: resource.sourceName,
+        isVideo: isVideo,
+        height: _h,
+        radius: _radius,
+      );
     }
 
     return ClipRRect(
-      borderRadius: radius,
-      child: Stack(children: [
-        // Image with shimmer placeholder
-        CachedNetworkImage(
-          imageUrl: thumb,
-          width: double.infinity,
-          height: isClearbit ? 100 : h,
-          fit: isClearbit ? BoxFit.contain : BoxFit.cover,
-          memCacheWidth: 640,
-          memCacheHeight: 360,
-          // ── Shimmer while loading ─────────────────────────────
-          placeholder: (_, __) => _ShimmerBox(
-              width: double.infinity, height: isClearbit ? 100 : h),
-          // ── Gradient bg for clearbit logos ───────────────────
-          imageBuilder: isClearbit
-              ? (_, img) => Container(
-                    width: double.infinity,
-                    height: 100,
-                    color: _catColors[resource.category]?.withOpacity(0.12)
-                        ?? Colors.grey.withOpacity(0.1),
-                    padding: const EdgeInsets.all(16),
-                    child: Image(image: img, fit: BoxFit.contain),
-                  )
-              : null,
-          errorWidget: (_, __, ___) => _GradientPlaceholder(
-              category: resource.category, sourceName: resource.sourceName,
-              isVideo: isVideo, height: h, radius: BorderRadius.zero),
-        ),
-        // Play button overlay on YouTube thumbnails
-        if (isVideo && !isClearbit)
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.transparent, Colors.black.withOpacity(0.45)],
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                ),
-              ),
-              child: const Center(
-                child: Icon(Icons.play_circle_filled, color: Colors.white, size: 58),
-              ),
+      borderRadius: _radius,
+      child: Stack(
+        children: [
+          CachedNetworkImage(
+            imageUrl: thumb,
+            width: double.infinity,
+            height: _h,
+            fit: BoxFit.cover,
+            memCacheWidth: 640,
+            memCacheHeight: 360,
+            placeholder: (_, __) =>
+                _ShimmerBox(width: double.infinity, height: _h),
+            errorWidget: (_, __, ___) => _GradientPlaceholder(
+              category: resource.category,
+              sourceName: resource.sourceName,
+              isVideo: isVideo,
+              height: _h,
+              radius: BorderRadius.zero,
             ),
           ),
-      ]),
+          // Play overlay on videos
+          if (isVideo)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.45)
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(Icons.play_circle_filled,
+                      color: Colors.white, size: 58),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

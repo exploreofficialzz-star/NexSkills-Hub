@@ -32,6 +32,18 @@ class HiveService {
       Hive.box<ResourceModel>(_resourceBox);
 
   /// Public access for RssService new-item notification count.
+  /// Keeps only the [keep] most-recent items for [category].
+  /// Called after every fetch so the box never grows stale indefinitely.
+  static Future<void> trimCategory(String category,
+      {int keep = 150}) async {
+    final items = getResourcesByCategory(category); // newest-first
+    if (items.length <= keep) return;
+    final toDelete = items.sublist(keep); // oldest items beyond the limit
+    for (final item in toDelete) {
+      await _resources.delete(item.id);
+    }
+  }
+
   static Box<ResourceModel> get resourceBox => _resources;
 
   static List<ResourceModel> getResourcesByCategory(String category) {
