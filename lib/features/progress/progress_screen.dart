@@ -5,7 +5,6 @@ import '../../core/models/resource_model.dart';
 import '../../core/models/user_progress.dart';
 import '../../core/services/hive_service.dart';
 import '../../core/services/notification_service.dart';
-import '../../core/services/ad_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../premium/premium_screen.dart';
 import '../explore/resource_viewer_screen.dart';
@@ -59,10 +58,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
               children: [
                 _buildHeader(c),
                 const SizedBox(height: 20),
-                if (!_progress.isPremium) ...[
-                  _buildPremiumBanner(c),
-                  const SizedBox(height: 20),
-                ],
                 _buildStatsRow(c),
                 const SizedBox(height: 24),
                 _buildCurrentPath(c),
@@ -73,7 +68,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 const SizedBox(height: 24),
                 _buildSettings(c),
                 const SizedBox(height: 20),
-                const AdaptiveBannerWidget(),
               ],
             ),
           ),
@@ -82,8 +76,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  // ─── Header ───────────────────────────────────────────────────────────────
   Widget _buildHeader(NexColors c) {
+    final adFree = HiveService.isAdFree();
     return Row(
       children: [
         Expanded(
@@ -95,64 +89,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       color: c.textPrimary, fontSize: 28,
                       fontWeight: FontWeight.w800, letterSpacing: -0.8)),
               Text(
-                _progress.isPremium ? '👑 Premium Member' : 'Free Plan',
+                adFree ? '🚫 Ad-Free' : 'Free Plan',
                 style: TextStyle(
-                    color: _progress.isPremium ? NexColors.gold : c.textMuted,
+                    color: adFree ? NexColors.success : c.textMuted,
                     fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
-        if (!_progress.isPremium)
-          GestureDetector(
-            onTap: _openPremium,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [NexColors.primary, NexColors.accent]),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text('Go Premium',
-                  style: TextStyle(
-                      color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
-            ),
-          ),
       ],
-    );
-  }
-
-  // ─── Premium banner ────────────────────────────────────────────────────────
-  Widget _buildPremiumBanner(NexColors c) {
-    return GestureDetector(
-      onTap: _openPremium,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              colors: [NexColors.primary, NexColors.accent]),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Row(
-          children: [
-            Text('👑', style: TextStyle(fontSize: 32)),
-            SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Unlock Premium',
-                      style: TextStyle(color: Colors.white, fontSize: 16,
-                          fontWeight: FontWeight.w800)),
-                  Text('Remove all ads · All 5 tracks · \$9.99/mo',
-                      style: TextStyle(color: Colors.white70, fontSize: 12)),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
-          ],
-        ),
-      ),
     );
   }
 
@@ -407,16 +352,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 onTap: _openReminderPicker,
               ),
               Divider(height: 1, color: c.border),
-              // Premium
+              // Remove Ads — opens popup modal
               _SettingsTile(
-                icon: Icons.workspace_premium_outlined,
-                label: 'Premium',
-                subtitle: _progress.isPremium
-                    ? 'Active — \$9.99/month'
-                    : 'Upgrade for ad-free learning',
+                icon: Icons.block_outlined,
+                label: 'Remove Ads',
+                subtitle: HiveService.isAdFree()
+                    ? 'Active — Ad-free until ${_adFreeUntil()}'
+                    : 'From \$0.99 · Day · Week · Month',
                 c: c,
-                onTap: _openPremium,
-                trailing: _progress.isPremium
+                onTap: _openRemoveAds,
+                trailing: HiveService.isAdFree()
                     ? const Icon(Icons.check_circle,
                         color: NexColors.success, size: 20)
                     : null,
@@ -465,15 +410,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  void _openPremium() {
-    AdService.showInterstitial(onDismissed: () {
-      if (mounted) {
-        Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PremiumScreen()))
-            .then((_) =>
-                setState(() => _progress = HiveService.getProgress()));
-      }
-    });
+  void _openRemoveAds() {
+    RemoveAdsModal.show(context);
+    // Refresh state when modal closes so status row updates
+    Future.delayed(const Duration(seconds: 1),
+        () { if (mounted) setState(() => _progress = HiveService.getProgress()); });
+  }
+
+  String _adFreeUntil() {
+    final expiry = HiveService.getProgress().premiumExpiry;
+    if (expiry == null) return 'forever';
+    return '${expiry.day}/${expiry.month}/${expiry.year}';
   }
 
   Future<void> _openReminderPicker() async {
@@ -610,18 +557,13 @@ class _BookmarkTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        AdService.showInterstitial(
-          contentId: resource.id,
-          onDismissed: () {
-            if (context.mounted) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => ResourceViewerScreen(resource: resource)),
-              );
-            }
-          },
-        );
+        if (context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => ResourceViewerScreen(resource: resource)),
+          );
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),

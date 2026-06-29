@@ -21,9 +21,9 @@ class RssService {
     final flat = results.expand((r) => r).toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
-    // Count truly new items (not yet in Hive) for notification
+    // Identify genuinely new items BEFORE saving so we can detect first-time entries.
     final box = HiveService.resourceBox;
-    final newCount = flat.where((r) => !box.containsKey(r.id)).length;
+    final newItems = flat.where((r) => !box.containsKey(r.id)).toList();
 
     await HiveService.saveResources(flat);
 
@@ -31,10 +31,21 @@ class RssService {
     // 150 items per category = ~750 total max, all recent.
     await HiveService.trimCategory(category, keep: 150);
 
-    // Fire new-content notification for this category if there are new items
-    if (newCount > 0) {
+    // Schedule staggered channel alerts for new YouTube videos.
+    // These fire at 2 PM (not immediately) so we never spam at app open.
+    if (newItems.isNotEmpty) {
       try {
-        await NotificationService.showNewContentNotification(category, newCount);
+        final newVideos = newItems
+            .where((r) => r.type == 'video')
+            .map((r) => NewVideoInfo(
+                  channelName: r.sourceName,
+                  videoTitle: r.title,
+                  category: category,
+                ))
+            .toList();
+        if (newVideos.isNotEmpty) {
+          await NotificationService.scheduleChannelAlerts(newVideos: newVideos);
+        }
       } catch (_) {}
     }
 

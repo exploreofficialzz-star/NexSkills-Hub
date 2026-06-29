@@ -44,6 +44,22 @@ class HiveService {
     }
   }
 
+  /// True when the user has an active "Remove Ads" purchase.
+  /// Repurposes the existing isPremium + premiumExpiry fields so no model
+  /// migration is needed. Automatically clears expired purchases.
+  static bool isAdFree() {
+    final p = getProgress();
+    if (!p.isPremium) return false;
+    if (p.premiumExpiry != null && DateTime.now().isAfter(p.premiumExpiry!)) {
+      // Silently expire — non-blocking best-effort
+      p.isPremium = false;
+      p.premiumExpiry = null;
+      p.save().ignore();
+      return false;
+    }
+    return true;
+  }
+
   static Box<ResourceModel> get resourceBox => _resources;
 
   static List<ResourceModel> getResourcesByCategory(String category) {
