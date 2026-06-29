@@ -400,14 +400,7 @@ class _TodayScreenState extends State<TodayScreen>
 
   Widget _buildPremiumNudge(NexColors c) {
     return GestureDetector(
-      onTap: () {
-        AdManager.instance.showInterstitial(onDismissed: () {
-          if (mounted) {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PremiumScreen()));
-          }
-        });
-      },
+      onTap: () => RemoveAdsModal.show(context),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

@@ -62,10 +62,8 @@ class _AdBlockSheetState extends State<_AdBlockSheet> {
 
   void _goToPremium() {
     Navigator.pop(context);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PremiumScreen()),
-    ).then((_) => widget.onSubscribed?.call());
+    RemoveAdsModal.show(context);
+    widget.onSubscribed?.call();
   }
 
   @override
