@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/services/ad_service.dart';
 import '../../core/services/ad_manager.dart';
 import '../../core/services/content_health_service.dart';
 import '../../core/services/notification_service.dart';
@@ -44,9 +43,14 @@ class _HomeScreenState extends State<HomeScreen>
 
     // Post-frame: safe to load ads and run background tasks.
     // Ads are NEVER loaded before the first frame (AdMob policy).
+    // AdManager.instance.init() is the SINGLE preload path for every ad
+    // format — interstitial, rewarded, rewarded-interstitial, plus Unity's
+    // mirrors of each. Previously AdService.preloadAllPostFrame() ALSO ran
+    // here and independently re-loaded the same ad unit IDs, which meant
+    // two concurrent load() requests raced each other for identical
+    // inventory every time the app started. Removed.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await AdManager.instance.init();
-      AdService.preloadAllPostFrame();
       ContentHealthService.runDailyCheckInBackground();
       // Request notification permissions and schedule daily reminder
       _setupNotifications();

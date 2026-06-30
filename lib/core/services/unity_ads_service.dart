@@ -16,11 +16,13 @@ import 'hive_service.dart';
 /// No native placement exists in the Unity dashboard, so native ads remain
 /// AdMob-only (see AdConstants.androidNativeId / AdManager.nativeAdUnitId).
 ///
-/// NOTE: this targets the `unity_ads_plugin` v4.x API surface
-/// (UnityAds.init / UnityAds.load / UnityAds.showVideoAd / UnityBannerAd).
-/// If your pinned package version differs, double-check these method
-/// signatures against your installed version before shipping —
-/// this sandbox has no network access to run `flutter pub get` and verify.
+/// NOTE: this targets the `unity_ads_plugin` package's public API
+/// (UnityAds.init / UnityAds.load / UnityAds.showVideoAd / UnityBannerAd),
+/// pinned in pubspec.yaml to ^0.4.0 (confirmed via pub's dependency
+/// resolver — there is no 4.x release of this package on pub.dev).
+/// Debug logging is wired into every load/show callback below specifically
+/// so any signature drift or no-fill condition shows up in logcat with
+/// the actual error/message rather than failing silently.
 class UnityAdsService {
   UnityAdsService._();
   static final UnityAdsService instance = UnityAdsService._();
@@ -62,15 +64,16 @@ class UnityAdsService {
         testMode: false, // LIVE — matches AdMob going live in this release
         onComplete: () {
           _initialized = true;
+          debugPrint('[UnityAds] SDK initialized (gameId=$_gameId)');
           loadInterstitial();
           loadRewarded();
         },
         onFailed: (error, message) {
-          debugPrint('UnityAds init failed: $error $message');
+          debugPrint('[UnityAds] init FAILED: $error $message');
         },
       );
     } catch (e) {
-      debugPrint('UnityAds init threw: $e');
+      debugPrint('[UnityAds] init threw: $e');
     }
   }
 
@@ -79,8 +82,14 @@ class UnityAdsService {
     if (!_initialized || _interstitialReady) return;
     UnityAds.load(
       placementId: _interstitialPlacement,
-      onComplete: (_) => _interstitialReady = true,
-      onFailed: (_, __, ___) => _interstitialReady = false,
+      onComplete: (_) {
+        _interstitialReady = true;
+        debugPrint('[UnityAds] Interstitial LOADED ($_interstitialPlacement)');
+      },
+      onFailed: (_, error, message) {
+        _interstitialReady = false;
+        debugPrint('[UnityAds] Interstitial FAILED: $error $message');
+      },
     );
   }
 
@@ -118,8 +127,14 @@ class UnityAdsService {
     if (!_initialized || _rewardedReady) return;
     UnityAds.load(
       placementId: _rewardedPlacement,
-      onComplete: (_) => _rewardedReady = true,
-      onFailed: (_, __, ___) => _rewardedReady = false,
+      onComplete: (_) {
+        _rewardedReady = true;
+        debugPrint('[UnityAds] Rewarded LOADED ($_rewardedPlacement)');
+      },
+      onFailed: (_, error, message) {
+        _rewardedReady = false;
+        debugPrint('[UnityAds] Rewarded FAILED: $error $message');
+      },
     );
   }
 

@@ -1,35 +1,35 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../constants/app_constants.dart';
-import 'hive_service.dart';
-import 'unity_ads_service.dart';
+import 'ad_manager.dart';
 
 /// AdService — SDK initialisation + legacy ad helpers.
 ///
+/// IMPORTANT: as of this revision, AdService no longer maintains its own
+/// InterstitialAd/RewardedAd/RewardedInterstitialAd instances. It previously
+/// did, in parallel with AdManager, which meant BOTH classes independently
+/// called InterstitialAd.load() / RewardedAd.load() for the exact same
+/// ad unit IDs at app start — two concurrent load requests racing each
+/// other for the same inventory, plus two disconnected ready-state flags
+/// and two disconnected cooldown clocks for what should be one ad slot.
+/// Concretely, this caused the "bonus XP" rewarded ad to behave
+/// differently on path_detail_screen (which called AdManager.showRewarded)
+/// than on content_viewer_screen/resource_viewer_screen (which called
+/// AdService.showRewarded) — same ad unit, two unrelated readiness states.
+///
+/// AdService now delegates every show*() call to AdManager.instance, which
+/// is the single source of truth for every interstitial/rewarded/rewarded-
+/// interstitial instance in the app. This removes the duplicate load calls
+/// entirely while keeping every existing call site (shared_widgets.dart,
+/// content_viewer_screen.dart, resource_viewer_screen.dart) unchanged —
+/// none of them inspect the bool return value, so the signatures below
+/// stay identical on purpose.
+///
 /// App-open ads are intentionally NOT included per product decision.
-/// All interstitial/rewarded orchestration is in AdManager.
 class AdService {
-  static InterstitialAd? _interstitialAd;
-  static RewardedAd? _rewardedAd;
-  static RewardedInterstitialAd? _rewardedInterstitialAd;
-
-  static bool _interstitialLoading = false;
-  static bool _rewardedLoading = false;
-  static bool _rewardedInterstitialLoading = false;
-
   static String get _bannerId =>
       Platform.isIOS ? AdConstants.iosBannerId : AdConstants.androidBannerId;
-
-  static String get _interstitialId =>
-      Platform.isIOS ? AdConstants.iosInterstitialId : AdConstants.androidInterstitialId;
-
-  static String get _rewardedId =>
-      Platform.isIOS ? AdConstants.iosRewardedId : AdConstants.androidRewardedId;
-
-  static String get _rewardedInterstitialId =>
-      Platform.isIOS ? AdConstants.iosRewardedInterstitialId : AdConstants.androidRewardedInterstitialId;
 
   static const AdRequest _request = AdRequest();
 
@@ -48,17 +48,10 @@ class AdService {
   /// Legacy entry point kept for compatibility.
   static Future<void> initialize() async => initializeSdkOnly();
 
-  /// Called from HomeScreen postFrameCallback — safe to start loading creatives.
-  static void preloadAllPostFrame() {
-    _preloadInterstitial();
-    _preloadRewarded();
-    _preloadRewardedInterstitial();
-    UnityAdsService.instance.loadInterstitial();
-    UnityAdsService.instance.loadRewarded();
-    // App-open ads: intentionally not preloaded per product decision.
-  }
-
   // ── Adaptive / standard banner ─────────────────────────────────
+  // Banner has no duplication issue — each screen creates its own
+  // independent BannerAd instance by design (that's how AdMob banners
+  // work), so this stays exactly as it was.
   static Future<BannerAd> createAdaptiveBanner(BuildContext context) async {
     final width = MediaQuery.of(context).size.width.truncate();
     final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
@@ -77,145 +70,43 @@ class AdService {
         listener: BannerAdListener(onAdFailedToLoad: (ad, _) => ad.dispose()),
       );
 
-  // ── Interstitial ───────────────────────────────────────────────
-  static void _preloadInterstitial() {
-    if (_interstitialLoading || _interstitialAd != null) return;
-    _interstitialLoading = true;
-    InterstitialAd.load(
-      adUnitId: _interstitialId,
-      request: _request,
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialAd = ad;
-          _interstitialLoading = false;
-          ad.setImmersiveMode(true);
-        },
-        onAdFailedToLoad: (_) => _interstitialLoading = false,
-      ),
-    );
-  }
-
+  // ── Interstitial — delegates to AdManager's single shared instance ──
   /// [onDismissed] is always called — navigation is never blocked.
-  /// Mediation: AdMob first, Unity Ads fallback when AdMob has nothing ready.
   static Future<bool> showInterstitial({
     VoidCallback? onDismissed,
     String? contentId,
   }) async {
-    final progress = HiveService.getProgress();
-    if (progress.isPremium || !progress.canShowInterstitial) {
-      onDismissed?.call();
-      return false;
-    }
-    if (_interstitialAd == null) {
-      _preloadInterstitial();
-      // AdMob has nothing ready — try Unity before giving up.
-      final shownByUnity =
-          await UnityAdsService.instance.showInterstitial(onDismissed: onDismissed);
-      if (shownByUnity) HiveService.recordInterstitialShown();
-      return shownByUnity;
-    }
-    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _interstitialAd = null;
-        _preloadInterstitial();
-        HiveService.recordInterstitialShown();
-        onDismissed?.call();
-      },
-      onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _interstitialAd = null;
-        _preloadInterstitial();
-        onDismissed?.call();
-      },
-    );
-    await _interstitialAd!.show();
-    return true;
+    return AdManager.instance.showInterstitial(onDismissed: onDismissed);
   }
 
-  // ── Rewarded ───────────────────────────────────────────────────
-  static void _preloadRewarded() {
-    if (_rewardedLoading || _rewardedAd != null) return;
-    _rewardedLoading = true;
-    RewardedAd.load(
-      adUnitId: _rewardedId,
-      request: _request,
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) { _rewardedAd = ad; _rewardedLoading = false; },
-        onAdFailedToLoad: (_) => _rewardedLoading = false,
-      ),
-    );
-  }
-
+  // ── Rewarded — delegates to AdManager's single shared instance ──────
   static Future<bool> showRewarded({
     required void Function(RewardItem reward) onRewarded,
     VoidCallback? onDismissed,
   }) async {
-    if (HiveService.getProgress().isPremium) return false;
-    if (_rewardedAd == null) {
-      _preloadRewarded();
-      // AdMob rewarded not ready — try Unity's rewarded placement.
-      return UnityAdsService.instance.showRewarded(
-        onEarned: () => onRewarded(RewardItem(1, 'unity_reward')),
-        onDismissed: onDismissed,
-      );
-    }
-    _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _rewardedAd = null; _preloadRewarded();
-        onDismissed?.call();
-      },
-      onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _rewardedAd = null; _preloadRewarded();
-        onDismissed?.call();
-      },
+    var earned = false;
+    await AdManager.instance.showRewarded(
+      onEarned: (r) { earned = true; onRewarded(r); },
+      onDismissed: onDismissed,
     );
-    await _rewardedAd!.show(onUserEarnedReward: (_, r) => onRewarded(r));
-    return true;
+    return earned;
   }
 
-  // ── Rewarded Interstitial ──────────────────────────────────────
-  static void _preloadRewardedInterstitial() {
-    if (_rewardedInterstitialLoading || _rewardedInterstitialAd != null) return;
-    _rewardedInterstitialLoading = true;
-    RewardedInterstitialAd.load(
-      adUnitId: _rewardedInterstitialId,
-      request: _request,
-      rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
-        onAdLoaded: (ad) { _rewardedInterstitialAd = ad; _rewardedInterstitialLoading = false; },
-        onAdFailedToLoad: (_) => _rewardedInterstitialLoading = false,
-      ),
-    );
-  }
-
+  // ── Rewarded Interstitial — delegates to AdManager's shared instance ──
   static Future<bool> showRewardedInterstitial({
     required void Function(RewardItem reward) onRewarded,
     VoidCallback? onDismissed,
   }) async {
-    if (HiveService.getProgress().isPremium) return false;
-    if (_rewardedInterstitialAd == null) {
-      _preloadRewardedInterstitial();
-      return false;
-    }
-    _rewardedInterstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose(); _rewardedInterstitialAd = null; _preloadRewardedInterstitial();
-        onDismissed?.call();
-      },
-      onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose(); _rewardedInterstitialAd = null; _preloadRewardedInterstitial();
-        onDismissed?.call();
-      },
+    var earned = false;
+    await AdManager.instance.showRewardedInterstitial(
+      onEarned: (r) { earned = true; onRewarded(r); },
+      onDismissed: onDismissed,
     );
-    await _rewardedInterstitialAd!.show(onUserEarnedReward: (_, r) => onRewarded(r));
-    return true;
+    return earned;
   }
 
-  static void dispose() {
-    _interstitialAd?.dispose();
-    _rewardedAd?.dispose();
-    _rewardedInterstitialAd?.dispose();
-  }
+  /// No-op — AdManager.instance.dispose() now owns the actual ad instances.
+  static void dispose() {}
 }
 
 // ── Lifecycle observer (app-resume handler) ────────────────────────────────────

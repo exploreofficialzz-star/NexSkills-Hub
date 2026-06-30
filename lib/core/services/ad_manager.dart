@@ -131,8 +131,13 @@ class AdManager {
           _interstitial = ad;
           _interstitialLoading = false;
           ad.setImmersiveMode(true);
+          debugPrint('[AdManager] Interstitial LOADED ($_interstitialId)');
         },
-        onAdFailedToLoad: (_) => _interstitialLoading = false,
+        onAdFailedToLoad: (error) {
+          _interstitialLoading = false;
+          debugPrint('[AdManager] Interstitial FAILED: '
+              'code=${error.code} domain=${error.domain} msg=${error.message}');
+        },
       ),
     );
   }
@@ -147,17 +152,24 @@ class AdManager {
   /// by every interstitial placement rule below.
   Future<bool> showInterstitial({VoidCallback? onDismissed}) async {
     if (HiveService.getProgress().isPremium) { onDismissed?.call(); return false; }
-    if (_isCoolingDown())                    { onDismissed?.call(); return false; }
+    if (_isCoolingDown()) {
+      debugPrint('[AdManager] Interstitial skipped — cooldown active');
+      onDismissed?.call();
+      return false;
+    }
 
     if (_interstitial == null) {
+      debugPrint('[AdManager] Interstitial not ready — trying Unity fallback');
       loadInterstitial();
       // AdMob has nothing ready — try Unity before giving up entirely.
       final shownByUnity = await UnityAdsService.instance.showInterstitial(
         onDismissed: onDismissed,
       );
+      debugPrint('[AdManager] Unity interstitial shown=$shownByUnity');
       if (shownByUnity) _lastShownAt = DateTime.now();
       return shownByUnity;
     }
+    debugPrint('[AdManager] Showing AdMob interstitial');
     _interstitial!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose(); _interstitial = null;
@@ -245,8 +257,16 @@ class AdManager {
       adUnitId: _rewardedId,
       request: _request,
       rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) { _rewarded = ad; _rewardedLoading = false; },
-        onAdFailedToLoad: (_) => _rewardedLoading = false,
+        onAdLoaded: (ad) {
+          _rewarded = ad;
+          _rewardedLoading = false;
+          debugPrint('[AdManager] Rewarded LOADED ($_rewardedId)');
+        },
+        onAdFailedToLoad: (error) {
+          _rewardedLoading = false;
+          debugPrint('[AdManager] Rewarded FAILED: '
+              'code=${error.code} domain=${error.domain} msg=${error.message}');
+        },
       ),
     );
   }

@@ -138,7 +138,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   void _openResource(ResourceModel r) {
-    // EXPLORE RULE: clicks 1,4,7,10… get an ad; clicks 2,3,5,6,8,9… skip.
+    // EXPLORE RULE: every 4th content open gets an ad (clicks 4, 8, 12…).
     AdManager.instance.showInterstitialOnExploreClick(
       onDismissed: () {
         if (!mounted) return;
