@@ -245,7 +245,7 @@ class AdManager {
       // real RewardItem (amount=1, type='unity_reward') to satisfy the
       // shared onEarned(RewardItem) signature used throughout the app.
       await UnityAdsService.instance.showRewarded(
-        onEarned: () => onEarned(const RewardItem(1, 'unity_reward')),
+        onEarned: () => onEarned(RewardItem(1, 'unity_reward')),
         onDismissed: onDismissed,
       );
       return;

@@ -156,7 +156,7 @@ class AdService {
       _preloadRewarded();
       // AdMob rewarded not ready — try Unity's rewarded placement.
       return UnityAdsService.instance.showRewarded(
-        onEarned: () => onRewarded(const RewardItem(1, 'unity_reward')),
+        onEarned: () => onRewarded(RewardItem(1, 'unity_reward')),
         onDismissed: onDismissed,
       );
     }
