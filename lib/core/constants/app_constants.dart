@@ -146,8 +146,7 @@ class AdConstants {
   static const androidRewardedId         = 'ca-app-pub-2492078126313994/5558477847';
   static const androidRewardedInterstitialId = 'ca-app-pub-2492078126313994/3430402711';
   static const androidNativeId           = 'ca-app-pub-2492078126313994/9800975184';
-  // App-open: create this in AdMob → Ad units → App open. Paste ID here.
-  static const androidAppOpenId          = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
+  static const androidAppOpenId          = 'ca-app-pub-2492078126313994/7011963611';
 
   // iOS — replace with your real iOS AdMob unit IDs
   static const iosBannerId               = 'ca-app-pub-2492078126313994/XXXXXXXXXX';
@@ -159,6 +158,25 @@ class AdConstants {
 
   // Policy: min 60s between interstitials. We use 90s for safety margin.
   static const interstitialCooldownSeconds = 90;
+}
+
+// ─── Unity Ads constants — secondary network, mediated with AdMob ───────────
+// Unity Ads fires only when AdMob has no ad ready, raising overall fill rate.
+// Dashboard: Unity Game ID 800079032, Org core ID 11270685239848.
+// Only Interstitial / Rewarded / Banner placements exist — no native placement
+// was created, so native ads remain AdMob-only (see AdConstants.androidNativeId).
+class UnityAdsConstants {
+  // Android — PRODUCTION (your real Unity dashboard values)
+  static const androidGameId                  = '800079032';
+  static const androidInterstitialPlacementId = 'Interstitial_Android';
+  static const androidRewardedPlacementId     = 'Rewarded_Android';
+  static const androidBannerPlacementId       = 'Banner_Android';
+
+  // iOS — create an iOS Unity project in the same dashboard, then paste here.
+  static const iosGameId                  = 'XXXXXXXXX';
+  static const iosInterstitialPlacementId = 'Interstitial_iOS';
+  static const iosRewardedPlacementId     = 'Rewarded_iOS';
+  static const iosBannerPlacementId       = 'Banner_iOS';
 }
 
 // ─── Categories ───────────────────────────────────────────────────────────────

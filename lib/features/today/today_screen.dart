@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/learning_path.dart';
 import '../../core/models/user_progress.dart';
@@ -8,6 +7,7 @@ import '../../core/services/path_service.dart';
 import '../../core/services/ad_manager.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../../shared/widgets/mediated_banner_widget.dart';
 import '../paths/content_viewer_screen.dart';
 import '../premium/premium_screen.dart';
 
@@ -25,10 +25,6 @@ class _TodayScreenState extends State<TodayScreen>
   PathStep? _todayStep;
   bool _loading = true;
 
-  // Inline banner between streak card and lesson
-  BannerAd? _bannerAd;
-  bool _bannerLoaded = false;
-
   @override
   bool get wantKeepAlive => true;
 
@@ -36,8 +32,6 @@ class _TodayScreenState extends State<TodayScreen>
   void initState() {
     super.initState();
     _load();
-    // Load banner AFTER first frame so it doesn't block the initial render
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBanner());
   }
 
   Future<void> _load() async {
@@ -64,17 +58,8 @@ class _TodayScreenState extends State<TodayScreen>
     }
   }
 
-  Future<void> _loadBanner() async {
-    if (HiveService.getProgress().isPremium) return;
-    if (ConnectivityService.instance.adBlocked) return;
-    final ad = AdManager.instance.createBannerAd();
-    await ad.load();
-    if (mounted) setState(() { _bannerAd = ad; _bannerLoaded = true; });
-  }
-
   @override
   void dispose() {
-    _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -142,11 +127,9 @@ class _TodayScreenState extends State<TodayScreen>
                     RepaintBoundary(child: _buildStreakCard(progress)),
                     const SizedBox(height: 16),
 
-                    // Banner ad between streak and lesson
-                    if (_bannerLoaded && _bannerAd != null) ...[
-                      _InlineBanner(ad: _bannerAd!, c: c),
-                      const SizedBox(height: 16),
-                    ],
+                    // Banner ad between streak and lesson — AdMob primary, Unity fallback
+                    const MediatedBannerWidget(label: 'Advertisement'),
+                    const SizedBox(height: 16),
 
                     _buildTodayLesson(c),
                     const SizedBox(height: 20),
@@ -521,26 +504,4 @@ class _WeeklyGoalCardState extends State<_WeeklyGoalCard> {
 }
 
 // ─── Inline banner widget ─────────────────────────────────────────────────────
-class _InlineBanner extends StatelessWidget {
-  final BannerAd ad;
-  final NexColors c;
-  const _InlineBanner({required this.ad, required this.c});
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text('Advertisement',
-            style: TextStyle(color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
-        const SizedBox(height: 4),
-        // SizedBox fills available width; height locked to ad spec (50px for banner)
-        SizedBox(
-          width: double.infinity,
-          height: ad.size.height.toDouble(),
-          child: AdWidget(ad: ad),
-        ),
-      ],
-    );
-  }
-}

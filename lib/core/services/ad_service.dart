@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../constants/app_constants.dart';
 import 'hive_service.dart';
+import 'unity_ads_service.dart';
 
 /// AdService — SDK initialisation + legacy ad helpers.
 ///
@@ -52,6 +53,8 @@ class AdService {
     _preloadInterstitial();
     _preloadRewarded();
     _preloadRewardedInterstitial();
+    UnityAdsService.instance.loadInterstitial();
+    UnityAdsService.instance.loadRewarded();
     // App-open ads: intentionally not preloaded per product decision.
   }
 
@@ -93,6 +96,7 @@ class AdService {
   }
 
   /// [onDismissed] is always called — navigation is never blocked.
+  /// Mediation: AdMob first, Unity Ads fallback when AdMob has nothing ready.
   static Future<bool> showInterstitial({
     VoidCallback? onDismissed,
     String? contentId,
@@ -104,8 +108,11 @@ class AdService {
     }
     if (_interstitialAd == null) {
       _preloadInterstitial();
-      onDismissed?.call();
-      return false;
+      // AdMob has nothing ready — try Unity before giving up.
+      final shownByUnity =
+          await UnityAdsService.instance.showInterstitial(onDismissed: onDismissed);
+      if (shownByUnity) HiveService.recordInterstitialShown();
+      return shownByUnity;
     }
     _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
@@ -145,7 +152,14 @@ class AdService {
     VoidCallback? onDismissed,
   }) async {
     if (HiveService.getProgress().isPremium) return false;
-    if (_rewardedAd == null) { _preloadRewarded(); return false; }
+    if (_rewardedAd == null) {
+      _preloadRewarded();
+      // AdMob rewarded not ready — try Unity's rewarded placement.
+      return UnityAdsService.instance.showRewarded(
+        onEarned: () => onRewarded(const RewardItem(1, 'unity_reward')),
+        onDismissed: onDismissed,
+      );
+    }
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose(); _rewardedAd = null; _preloadRewarded();

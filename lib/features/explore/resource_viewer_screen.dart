@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../core/constants/app_constants.dart';
@@ -7,6 +6,7 @@ import '../../core/models/resource_model.dart';
 import '../../core/services/hive_service.dart';
 import '../../core/services/ad_service.dart';
 import '../../core/services/revenue_config.dart';
+import '../../shared/widgets/mediated_banner_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ResourceViewerScreen extends StatefulWidget {
@@ -20,10 +20,6 @@ class ResourceViewerScreen extends StatefulWidget {
 class _ResourceViewerScreenState extends State<ResourceViewerScreen> {
   YoutubePlayerController? _ytController;
   bool _isBookmarked = false;
-
-  // In-content banner
-  BannerAd? _bannerAd;
-  bool _bannerLoaded = false;
 
   @override
   void initState() {
@@ -41,20 +37,11 @@ class _ResourceViewerScreenState extends State<ResourceViewerScreen> {
         ),
       );
     }
-    _loadBannerAd();
-  }
-
-  Future<void> _loadBannerAd() async {
-    if (HiveService.getProgress().isPremium) return;
-    final ad = AdService.createBanner();
-    await ad.load();
-    if (mounted) setState(() { _bannerAd = ad; _bannerLoaded = true; });
   }
 
   @override
   void dispose() {
     _ytController?.dispose();
-    _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -143,11 +130,17 @@ class _ResourceViewerScreenState extends State<ResourceViewerScreen> {
                     ),
                   ],
 
-                  // ── Banner ad (fills the empty space) ─────────
-                  if (_bannerLoaded && _bannerAd != null) ...[
-                    const SizedBox(height: 24),
-                    _InContentBannerAd(ad: _bannerAd!, c: c),
-                  ],
+                  // ── Banner ad — AdMob primary, Unity fallback ───
+                  const SizedBox(height: 24),
+                  Column(
+                    children: [
+                      Divider(color: c.border),
+                      const SizedBox(height: 4),
+                      const MediatedBannerWidget(label: 'Advertisement'),
+                      const SizedBox(height: 4),
+                      Divider(color: c.border),
+                    ],
+                  ),
 
                   // ── Rewarded bonus XP ─────────────────────────
                   const SizedBox(height: 20),
@@ -189,33 +182,7 @@ class _ResourceViewerScreenState extends State<ResourceViewerScreen> {
 }
 
 // ─── In-content banner ad ──────────────────────────────────────────────────────
-class _InContentBannerAd extends StatelessWidget {
-  final BannerAd ad;
-  final NexColors c;
-  const _InContentBannerAd({required this.ad, required this.c});
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Divider(color: c.border),
-        const SizedBox(height: 4),
-        Text('Advertisement',
-            style: TextStyle(
-                color: c.textMuted, fontSize: 10, letterSpacing: 0.5)),
-        const SizedBox(height: 6),
-        Container(
-          alignment: Alignment.center,
-          width: ad.size.width.toDouble(),
-          height: ad.size.height.toDouble(),
-          child: AdWidget(ad: ad),
-        ),
-        const SizedBox(height: 4),
-        Divider(color: c.border),
-      ],
-    );
-  }
-}
 
 // ─── Rewarded +50 XP button ────────────────────────────────────────────────────
 class _RewardedXPButton extends StatelessWidget {

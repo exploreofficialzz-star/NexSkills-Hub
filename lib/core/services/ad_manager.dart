@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../constants/app_constants.dart';
 import 'hive_service.dart';
+import 'unity_ads_service.dart';
 
 /// AdManager — precise, professionally-placed ad orchestration.
 ///
@@ -40,10 +41,9 @@ class AdManager {
   static const _testRewardedIntId  = 'ca-app-pub-3940256099942544/5354046379';
   static const _testNativeId       = 'ca-app-pub-3940256099942544/2247696110';
 
-  // ── Test-mode switch ──────────────────────────────────────────
-  // Set to false when your AdMob account is fully approved and
-  // you are ready to serve live ads to real users.
-  static const _useTestIds = true;
+  // ── Live-mode switch ──────────────────────────────────────────
+  // false = AdConstants real IDs (production revenue, both networks live)
+  static const _useTestIds = false;
 
   // ── ID getters ─────────────────────────────────────────────────
   // _useTestIds=true  → test IDs (loads in any build, no revenue)
@@ -88,10 +88,14 @@ class AdManager {
   static const _request = AdRequest();
 
   // ── Init (postFrameCallback only) ─────────────────────────────
+  // Both networks preload in parallel — AdMob is primary, Unity fills
+  // the gap whenever AdMob has nothing ready at show-time.
   Future<void> init() async {
     loadInterstitial();
     loadRewarded();
     loadRewardedInterstitial();
+    UnityAdsService.instance.loadInterstitial();
+    UnityAdsService.instance.loadRewarded();
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -119,13 +123,21 @@ class AdManager {
       DateTime.now().difference(_lastShownAt!).inSeconds < _cooldownSeconds;
 
   /// Raw show — [onDismissed] ALWAYS fires, navigation never blocked.
+  /// Mediation: AdMob is tried first; if it has no creative ready, Unity
+  /// Ads is attempted before giving up. This is the single waterfall used
+  /// by every interstitial placement rule below.
   Future<bool> showInterstitial({VoidCallback? onDismissed}) async {
     if (HiveService.getProgress().isPremium) { onDismissed?.call(); return false; }
     if (_isCoolingDown())                    { onDismissed?.call(); return false; }
+
     if (_interstitial == null) {
       loadInterstitial();
-      onDismissed?.call();
-      return false;
+      // AdMob has nothing ready — try Unity before giving up entirely.
+      final shownByUnity = await UnityAdsService.instance.showInterstitial(
+        onDismissed: onDismissed,
+      );
+      if (shownByUnity) _lastShownAt = DateTime.now();
+      return shownByUnity;
     }
     _interstitial!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
@@ -226,7 +238,18 @@ class AdManager {
     VoidCallback? onDismissed,
   }) async {
     if (HiveService.getProgress().isPremium) { onDismissed?.call(); return; }
-    if (_rewarded == null) { loadRewarded(); onDismissed?.call(); return; }
+    if (_rewarded == null) {
+      loadRewarded();
+      // AdMob rewarded not ready — try Unity's rewarded placement.
+      // Unity's plugin has no RewardItem object of its own, so we build a
+      // real RewardItem (amount=1, type='unity_reward') to satisfy the
+      // shared onEarned(RewardItem) signature used throughout the app.
+      await UnityAdsService.instance.showRewarded(
+        onEarned: () => onEarned(const RewardItem(1, 'unity_reward')),
+        onDismissed: onDismissed,
+      );
+      return;
+    }
     _rewarded!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose(); _rewarded = null; loadRewarded(); onDismissed?.call();

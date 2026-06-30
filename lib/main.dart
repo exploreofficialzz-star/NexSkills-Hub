@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/services/hive_service.dart';
 import 'core/services/ad_service.dart';
+import 'core/services/unity_ads_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/connectivity_service.dart';
 import 'shared/theme.dart';
@@ -130,6 +131,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _runServices() async {
     await Future.wait([
       AdService.initializeSdkOnly(),
+      UnityAdsService.instance.init(), // second ad network — mediated with AdMob
       ConnectivityService.instance.init(),
     ]);
     try {

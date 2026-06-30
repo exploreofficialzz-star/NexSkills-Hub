@@ -9,6 +9,7 @@ import '../../core/services/hive_service.dart';
 import '../../core/services/rss_service.dart';
 import '../../core/services/ad_manager.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../../shared/widgets/mediated_banner_widget.dart';
 import 'video_player_screen.dart';
 import 'resource_viewer_screen.dart';
 
@@ -30,8 +31,6 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _loading = true;
   bool _refreshing = false;
   String? _error;
-  BannerAd? _bottomBanner;
-  bool _bottomBannerLoaded = false;
   DateTime? _lastFetchTime; // tracks content freshness
 
 
@@ -59,7 +58,6 @@ class _ExploreScreenState extends State<ExploreScreen>
     _consumedIds = HiveService.getAllConsumedIds();
     _loadFromCache();
     _fetchFresh();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBottomBanner());
     // Listen for tab-return / app-resume signals from HomeScreen.
     widget.refreshTrigger?.addListener(_onRefreshTriggered);
   }
@@ -67,7 +65,6 @@ class _ExploreScreenState extends State<ExploreScreen>
   @override
   void dispose() {
     widget.refreshTrigger?.removeListener(_onRefreshTriggered);
-    _bottomBanner?.dispose();
     super.dispose();
   }
 
@@ -83,13 +80,6 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (stale) _fetchFresh();
   }
 
-
-  Future<void> _loadBottomBanner() async {
-    if (HiveService.getProgress().isPremium) return;
-    final ad = AdManager.instance.createBannerAd(AdSize.banner);
-    await ad.load();
-    if (mounted) setState(() { _bottomBanner = ad; _bottomBannerLoaded = true; });
-  }
 
   void _loadFromCache() {
     const allCats = ['ai', 'cybersecurity', 'nocode', 'data', 'cloud'];
@@ -344,10 +334,9 @@ class _ExploreScreenState extends State<ExploreScreen>
       count++;
       if (!isPremium && count % 3 == 0) withAds.add('native_ad');
     }
-    // Add bottom banner as final scrollable item (avoids nav-bar overlap)
-    if (!isPremium && _bottomBannerLoaded && _bottomBanner != null) {
-      withAds.add('bottom_banner');
-    }
+    // Add bottom banner as final scrollable item (avoids nav-bar overlap).
+    // MediatedBannerWidget self-gates on ad-free status — always append here.
+    withAds.add('bottom_banner');
 
     return ListView.builder(
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
@@ -355,7 +344,12 @@ class _ExploreScreenState extends State<ExploreScreen>
       itemCount: withAds.length,
       itemBuilder: (_, i) {
         if (withAds[i] == 'native_ad') return _NativeAdSlot(c: c);
-        if (withAds[i] == 'bottom_banner') return _ListBanner(ad: _bottomBanner!, c: c);
+        if (withAds[i] == 'bottom_banner') {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: MediatedBannerWidget(label: 'Advertisement'),
+          );
+        }
         final r = withAds[i] as ResourceModel;
         final isConsumed = _consumedIds.contains(r.id);
         return GestureDetector(
@@ -719,28 +713,4 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
 }
 
 // ─── Bottom banner as scrollable list item ────────────────────────────────────
-class _ListBanner extends StatelessWidget {
-  final BannerAd ad;
-  final NexColors c;
-  const _ListBanner({required this.ad, required this.c});
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Advertisement',
-              style: TextStyle(color: c.textMuted, fontSize: 9, letterSpacing: 0.5)),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: double.infinity,
-            height: ad.size.height.toDouble(),
-            child: AdWidget(ad: ad),
-          ),
-        ],
-      ),
-    );
-  }
-}
