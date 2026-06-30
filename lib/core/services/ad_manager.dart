@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -21,8 +22,7 @@ import 'unity_ads_service.dart';
 ///
 /// EXPLORE TAB
 ///   • Banner   : at the bottom of the scrollable list
-///   • Interstitial: clicks 1, 4, 7, 10… (every 3rd, starting from click 1)
-///                   clicks 2, 3, 5, 6, 8, 9… → navigate directly, no ad
+///   • Interstitial: every 4th content open (clicks 4, 8, 12…)
 ///   • Native ad : every 3 items in the feed
 ///
 /// GLOBAL RULES
@@ -79,7 +79,7 @@ class AdManager {
   static const _cooldownSeconds = AdConstants.interstitialCooldownSeconds; // 90s
 
   // ── Explore click counter ──────────────────────────────────────
-  // Pattern: clicks 1, 4, 7, 10… get an ad  (every 3rd, starting at 1)
+  // Pattern: every 4th content open gets an ad (clicks 4, 8, 12…)
   int _exploreClickCount = 0;
 
   bool get isInterstitialReady => _interstitial != null;
@@ -87,15 +87,34 @@ class AdManager {
 
   static const _request = AdRequest();
 
+  Timer? _retryTimer;
+
   // ── Init (postFrameCallback only) ─────────────────────────────
   // Both networks preload in parallel — AdMob is primary, Unity fills
   // the gap whenever AdMob has nothing ready at show-time.
+  //
+  // Also starts a 45s background retry loop. AdMob frequently returns
+  // "no fill" for brand-new ad units while Google's systems ramp up
+  // demand for that unit (commonly 24–72h) — this is an account/inventory
+  // constraint, not something a single load() call can fix. Retrying
+  // periodically maximises the odds a creative is actually ready by the
+  // time the user taps something, rather than only retrying reactively
+  // on every failed show() call.
   Future<void> init() async {
     loadInterstitial();
     loadRewarded();
     loadRewardedInterstitial();
     UnityAdsService.instance.loadInterstitial();
     UnityAdsService.instance.loadRewarded();
+
+    _retryTimer?.cancel();
+    _retryTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (_interstitial == null) loadInterstitial();
+      if (_rewarded == null) loadRewarded();
+      if (_rewardedInterstitial == null) loadRewardedInterstitial();
+      UnityAdsService.instance.loadInterstitial();
+      UnityAdsService.instance.loadRewarded();
+    });
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -200,17 +219,16 @@ class AdManager {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // EXPLORE TAB — every-3rd-click rule
-  // Clicks 1, 4, 7, 10… → interstitial
-  // Clicks 2, 3, 5, 6, 8, 9… → navigate directly
+  // EXPLORE TAB — every-4th-click rule
+  // Clicks 4, 8, 12… → interstitial
+  // Clicks 1, 2, 3, 5, 6, 7… → navigate directly
   // ─────────────────────────────────────────────────────────────
   Future<void> showInterstitialOnExploreClick({
     required VoidCallback onDismissed,
   }) async {
     if (HiveService.getProgress().isPremium) { onDismissed(); return; }
     _exploreClickCount++;
-    // Pattern: 1, 4, 7, 10… → (_exploreClickCount - 1) % 3 == 0
-    if ((_exploreClickCount - 1) % 3 == 0) {
+    if (_exploreClickCount % 4 == 0) {
       await showInterstitial(onDismissed: onDismissed);
     } else {
       onDismissed();
@@ -312,6 +330,7 @@ class AdManager {
       );
 
   void dispose() {
+    _retryTimer?.cancel();
     _interstitial?.dispose();
     _rewarded?.dispose();
     _rewardedInterstitial?.dispose();

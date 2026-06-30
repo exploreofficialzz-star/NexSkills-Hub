@@ -164,43 +164,56 @@ class _SplashScreenState extends State<SplashScreen> {
 
     return Scaffold(
       backgroundColor: bg,
-      body: Center(
+      body: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Icon — clipped so PNG corner artefacts are invisible ──
-            ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: const AppIconWidget(size: 112),
-            ),
-            const SizedBox(height: 24),
-            // ── App name ──────────────────────────────────────────────
-            Text(
-              'NexSkills Hub',
-              style: TextStyle(
-                color: fg,
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
+            // ── Icon + title — centered in the remaining space ────────
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: const AppIconWidget(size: 112),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'NexSkills Hub',
+                      style: TextStyle(
+                        color: fg,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Your tech learning companion',
+                      style: TextStyle(color: muted, fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Your tech learning companion',
-              style: TextStyle(color: muted, fontSize: 14),
-            ),
-            const SizedBox(height: 48),
-            // ── Three-dot bouncing loader ─────────────────────────────
-            const _DotsLoader(),
-            const SizedBox(height: 20),
-            // ── Brand attribution ─────────────────────────────────────
-            Text(
-              'by chAs',
-              style: TextStyle(
-                color: muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.5,
+            // ── Dots loader + brand attribution — pinned to the bottom ──
+            Padding(
+              padding: const EdgeInsets.only(bottom: 40),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const _DotsLoader(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'by chAs',
+                    style: TextStyle(
+                      color: muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

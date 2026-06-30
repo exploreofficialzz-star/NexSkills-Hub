@@ -646,7 +646,7 @@ class _ConsumedChip extends StatelessWidget {
   );
 }
 
-// ─── Native ad slot (every 3 items) ──────────────────────────────────────────
+// ─── Native ad slot (every 3 items) — sized like a content card ─────────────
 class _NativeAdSlot extends StatefulWidget {
   final NexColors c;
   const _NativeAdSlot({required this.c});
@@ -668,10 +668,12 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
         onAdFailedToLoad: (ad, _) { ad.dispose(); _ad = null; },
       ),
       request: const AdRequest(),
+      // Medium template — large image area + headline + body + CTA.
+      // Matches the visual weight of a real content card, not a banner strip.
       nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.small,
+        templateType: TemplateType.medium,
         mainBackgroundColor: widget.c.card,
-        cornerRadius: 12,
+        cornerRadius: 16,
         callToActionTextStyle: NativeTemplateTextStyle(
           textColor: Colors.white,
           backgroundColor: NexColors.primary,
@@ -680,11 +682,15 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
         ),
         primaryTextStyle: NativeTemplateTextStyle(
           textColor: widget.c.textPrimary,
-          style: NativeTemplateFontStyle.bold, size: 14,
+          style: NativeTemplateFontStyle.bold, size: 15,
         ),
         secondaryTextStyle: NativeTemplateTextStyle(
           textColor: widget.c.textMuted,
           style: NativeTemplateFontStyle.normal, size: 12,
+        ),
+        tertiaryTextStyle: NativeTemplateTextStyle(
+          textColor: widget.c.textMuted,
+          style: NativeTemplateFontStyle.normal, size: 11,
         ),
       ),
     )..load();
@@ -698,10 +704,13 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
     final c = widget.c;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      height: 80,
+      // Content cards run ~190px thumbnail + ~140px text body ≈ 330px.
+      // The medium native template needs this much room to render its
+      // image + headline + body + CTA without being cramped.
+      height: 330,
       decoration: BoxDecoration(
         color: c.card,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border, width: 0.5),
       ),
       child: _loaded && _ad != null

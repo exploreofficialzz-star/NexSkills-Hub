@@ -249,10 +249,12 @@ class _PathNativeAdSlotState extends State<_PathNativeAdSlot> {
         onAdFailedToLoad: (ad, _) { ad.dispose(); _ad = null; },
       ),
       request: const AdRequest(),
+      // Medium template — large image + headline + body + CTA, sized to
+      // match content cards rather than a small banner strip.
       nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.small,
+        templateType: TemplateType.medium,
         mainBackgroundColor: widget.c.card,
-        cornerRadius: 12,
+        cornerRadius: 16,
         callToActionTextStyle: NativeTemplateTextStyle(
           textColor: Colors.white,
           backgroundColor: NexColors.primary,
@@ -262,12 +264,17 @@ class _PathNativeAdSlotState extends State<_PathNativeAdSlot> {
         primaryTextStyle: NativeTemplateTextStyle(
           textColor: widget.c.textPrimary,
           style: NativeTemplateFontStyle.bold,
-          size: 14,
+          size: 15,
         ),
         secondaryTextStyle: NativeTemplateTextStyle(
           textColor: widget.c.textMuted,
           style: NativeTemplateFontStyle.normal,
           size: 12,
+        ),
+        tertiaryTextStyle: NativeTemplateTextStyle(
+          textColor: widget.c.textMuted,
+          style: NativeTemplateFontStyle.normal,
+          size: 11,
         ),
       ),
     )..load();
@@ -281,10 +288,10 @@ class _PathNativeAdSlotState extends State<_PathNativeAdSlot> {
     final c = widget.c;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 80,
+      height: 330,
       decoration: BoxDecoration(
         color: c.card,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border, width: 0.5),
       ),
       child: _loaded && _ad != null
