@@ -25,6 +25,11 @@ class RssService {
     final flat = results.expand((r) => r).toList()
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
 
+    final videoCount = flat.where((r) => r.type == 'video').length;
+    debugPrint('[RssService] ══ $category SUMMARY: $videoCount videos + '
+        '${flat.length - videoCount} articles (${flat.length} total) '
+        'from ${sources.length} sources ══');
+
     // Identify genuinely new items BEFORE saving so we can detect first-time entries.
     final box = HiveService.resourceBox;
     final newItems = flat.where((r) => !box.containsKey(r.id)).toList();
@@ -175,6 +180,35 @@ class RssService {
       return [];
     }
 
+    // Raw <item>...</item> blocks — used ONLY to recover Media RSS
+    // thumbnail tags (<media:thumbnail>, <media:content>) that dart_rss's
+    // structured RssItem doesn't surface directly. Many enterprise blog
+    // platforms (Azure Blog, AWS Blog, etc. — this is exactly what was
+    // missing thumbnails) publish a featured image via these tags,
+    // separate from any <img> inside the body HTML.
+    // Paired to each parsed item by matching <link>/<guid> text inside the
+    // raw block (NOT by position — item order/count can differ if any
+    // entries fail to parse structurally).
+    final rawBlocks = RegExp(r'<item>([\s\S]*?)</item>', caseSensitive: false)
+        .allMatches(body)
+        .map((m) => m.group(1) ?? '')
+        .toList();
+
+    String? mediaThumbFor(String? link, String? guid) {
+      if (link == null && guid == null) return null;
+      for (final block in rawBlocks) {
+        if ((link != null && block.contains(link)) ||
+            (guid != null && block.contains(guid))) {
+          final m = RegExp(
+            r'<media:(?:thumbnail|content)[^>]+url="([^"]+)"',
+            caseSensitive: false,
+          ).firstMatch(block);
+          if (m != null) return m.group(1);
+        }
+      }
+      return null;
+    }
+
     for (final item in feed.items) {
       try {
         final link = item.link;
@@ -183,9 +217,11 @@ class RssService {
 
         // Thumbnail priority:
         // 1. RSS enclosure (podcast / media)
-        // 2. <img> inside content:encoded or description HTML
-        // 3. null → _GradientPlaceholder shown in the UI (looks better than Clearbit logos)
+        // 2. Media RSS <media:thumbnail>/<media:content> — enterprise blogs
+        // 3. <img> inside content:encoded or description HTML
+        // 4. null → _GradientPlaceholder shown in the UI
         String? thumbnail = item.enclosure?.url;
+        thumbnail ??= mediaThumbFor(link, item.guid);
         thumbnail ??= _extractImg(item.content?.value ?? '');
         thumbnail ??= _extractImg(item.description ?? '');
 
