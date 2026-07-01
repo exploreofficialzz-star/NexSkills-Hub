@@ -35,6 +35,7 @@ class _MediatedBannerWidgetState extends State<MediatedBannerWidget> {
   BannerAd? _admobAd;
   bool _admobLoaded = false;
   bool _admobFailed = false;
+  bool _unityFailed = false;
   bool _attempted = false;
 
   bool get _adFree => HiveService.isAdFree();
@@ -95,7 +96,7 @@ class _MediatedBannerWidgetState extends State<MediatedBannerWidget> {
         height: _admobAd!.size.height.toDouble(),
         child: AdWidget(ad: _admobAd!),
       );
-    } else if (_admobFailed) {
+    } else if (_admobFailed && !_unityFailed) {
       // Fallback network — Unity's banner placement.
       banner = SizedBox(
         width: 320,
@@ -103,7 +104,11 @@ class _MediatedBannerWidgetState extends State<MediatedBannerWidget> {
         child: UnityBannerAd(
           placementId: UnityAdsService.instance.bannerPlacementId,
           onLoad: (_) {},
-          onFailed: (_, __, ___) {},
+          onFailed: (_, __, ___) {
+            // Both networks now exhausted — collapse to nothing on next build
+            // instead of leaving a permanent empty 320×50 slot.
+            if (mounted) setState(() => _unityFailed = true);
+          },
         ),
       );
     }

@@ -246,15 +246,18 @@ class _PathNativeAdSlotState extends State<_PathNativeAdSlot> {
       adUnitId: AdManager.instance.nativeAdUnitId,
       listener: NativeAdListener(
         onAdLoaded: (_) { if (mounted) setState(() => _loaded = true); },
-        onAdFailedToLoad: (ad, _) { ad.dispose(); _ad = null; },
+        onAdFailedToLoad: (ad, _) {
+          ad.dispose();
+          if (mounted) setState(() { _ad = null; _loaded = false; });
+        },
       ),
       request: const AdRequest(),
-      // Medium template — large image + headline + body + CTA, sized to
-      // match content cards rather than a small banner strip.
+      // Reverted to the previous small template/size — the medium/330
+      // size didn't fit well in the path step list context.
       nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.medium,
+        templateType: TemplateType.small,
         mainBackgroundColor: widget.c.card,
-        cornerRadius: 16,
+        cornerRadius: 12,
         callToActionTextStyle: NativeTemplateTextStyle(
           textColor: Colors.white,
           backgroundColor: NexColors.primary,
@@ -264,17 +267,12 @@ class _PathNativeAdSlotState extends State<_PathNativeAdSlot> {
         primaryTextStyle: NativeTemplateTextStyle(
           textColor: widget.c.textPrimary,
           style: NativeTemplateFontStyle.bold,
-          size: 15,
+          size: 14,
         ),
         secondaryTextStyle: NativeTemplateTextStyle(
           textColor: widget.c.textMuted,
           style: NativeTemplateFontStyle.normal,
           size: 12,
-        ),
-        tertiaryTextStyle: NativeTemplateTextStyle(
-          textColor: widget.c.textMuted,
-          style: NativeTemplateFontStyle.normal,
-          size: 11,
         ),
       ),
     )..load();
@@ -285,19 +283,22 @@ class _PathNativeAdSlotState extends State<_PathNativeAdSlot> {
 
   @override
   Widget build(BuildContext context) {
+    // No ad loaded (still loading, or failed) → render nothing at all.
+    // Previously this always showed a bordered "Advertisement" placeholder
+    // box even when there was no creative to show, which is exactly the
+    // empty-container problem being fixed here.
+    if (!_loaded || _ad == null) return const SizedBox.shrink();
+
     final c = widget.c;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 330,
+      height: 80,
       decoration: BoxDecoration(
         color: c.card,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: c.border, width: 0.5),
       ),
-      child: _loaded && _ad != null
-          ? AdWidget(ad: _ad!)
-          : Center(child: Text('Advertisement',
-              style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5))),
+      child: AdWidget(ad: _ad!),
     );
   }
 }

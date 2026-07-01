@@ -40,7 +40,10 @@ class AppSources {
     ContentSource(
       name: 'Andrej Karpathy',
       type: SourceType.youtube,
-      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCH-kyQ9Q-6yS1XcNj8nNPPA',
+      // Verified via web search — the old ID (UCH-kyQ9Q-6yS1XcNj8nNPPA) pointed
+      // at a channel that doesn't exist / returns no feed, so this source
+      // silently contributed zero videos to the AI category on every fetch.
+      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCDklgnaowWTNnL2y8V_nAEA',
       category: 'ai', icon: '🤖',
     ),
     ContentSource(

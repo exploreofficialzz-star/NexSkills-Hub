@@ -326,13 +326,13 @@ class _ExploreScreenState extends State<ExploreScreen>
 
     final isPremium = HiveService.getProgress().isPremium;
 
-    // Interleave: native ad every 3 content items
+    // Interleave: native ad every 5 content items
     final withAds = <dynamic>[];
     int count = 0;
     for (final item in items) {
       withAds.add(item);
       count++;
-      if (!isPremium && count % 3 == 0) withAds.add('native_ad');
+      if (!isPremium && count % 5 == 0) withAds.add('native_ad');
     }
     // Add bottom banner as final scrollable item (avoids nav-bar overlap).
     // MediatedBannerWidget self-gates on ad-free status — always append here.
@@ -559,7 +559,13 @@ class _ShimmerBox extends StatelessWidget {
   }
 }
 
-// ─── Gradient Placeholder ─────────────────────────────────────────────────────
+// ─── Thumbnail fallback (no image available) ─────────────────────────────────
+// Deliberately NOT an animated shimmer — shimmer means "loading", and this
+// case is content that will never have a real thumbnail (most blog RSS
+// feeds don't embed an image). Animating it forever would be misleading.
+// Instead this uses the SAME neutral skeleton tones as _ShimmerBox so the
+// feed looks visually consistent rather than mixing loud colourful blocks
+// with muted shimmer cards.
 class _GradientPlaceholder extends StatelessWidget {
   final String category, sourceName;
   final bool isVideo;
@@ -571,38 +577,37 @@ class _GradientPlaceholder extends StatelessWidget {
     required this.isVideo, required this.height, required this.radius,
   });
 
-  static const _colors = {
-    'ai': Color(0xFF6C63FF), 'cybersecurity': Color(0xFF00C853),
-    'nocode': Color(0xFFFF6D00), 'data': Color(0xFF0091EA), 'cloud': Color(0xFF00B8D4),
-  };
   static const _icons = {
     'ai': '🤖', 'cybersecurity': '🔐', 'nocode': '⚡', 'data': '📊', 'cloud': '☁️',
   };
 
   @override
   Widget build(BuildContext context) {
-    final base = _colors[category] ?? const Color(0xFF6C63FF);
+    final isDark = context.isDark;
     final icon = _icons[category] ?? '📄';
+    final base      = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFE8E8EC);
+    final iconBg    = isDark ? const Color(0xFF2A2A3E) : const Color(0xFFDCDCE2);
+    final textColor = isDark ? Colors.white38 : Colors.black38;
+
     return ClipRRect(
       borderRadius: radius,
       child: Container(
         width: double.infinity, height: height,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [base.withOpacity(0.6), base.withOpacity(0.15)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-          ),
-        ),
+        color: base,
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(icon, style: const TextStyle(fontSize: 36)),
-          const SizedBox(width: 14),
+          Container(
+            width: 44, height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            child: Text(icon, style: const TextStyle(fontSize: 20)),
+          ),
+          const SizedBox(width: 12),
           Flexible(child: Text(sourceName,
-              style: const TextStyle(color: Colors.white70, fontSize: 14,
-                  fontWeight: FontWeight.w600),
+              style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis)),
           if (isVideo) ...[
-            const SizedBox(width: 14),
-            const Icon(Icons.play_circle_outline, color: Colors.white60, size: 36),
+            const SizedBox(width: 10),
+            Icon(Icons.play_circle_outline, color: textColor, size: 28),
           ],
         ]),
       ),
@@ -665,7 +670,10 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
       adUnitId: AdManager.instance.nativeAdUnitId,
       listener: NativeAdListener(
         onAdLoaded: (_) { if (mounted) setState(() => _loaded = true); },
-        onAdFailedToLoad: (ad, _) { ad.dispose(); _ad = null; },
+        onAdFailedToLoad: (ad, _) {
+          ad.dispose();
+          if (mounted) setState(() { _ad = null; _loaded = false; });
+        },
       ),
       request: const AdRequest(),
       // Medium template — large image area + headline + body + CTA.
@@ -701,6 +709,11 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
 
   @override
   Widget build(BuildContext context) {
+    // No ad loaded (still loading, or failed) → render nothing.
+    // Previously this always showed a bordered "Advertisement" placeholder
+    // box taking up 330px even with no creative to show.
+    if (!_loaded || _ad == null) return const SizedBox.shrink();
+
     final c = widget.c;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -713,10 +726,7 @@ class _NativeAdSlotState extends State<_NativeAdSlot> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border, width: 0.5),
       ),
-      child: _loaded && _ad != null
-          ? AdWidget(ad: _ad!)
-          : Center(child: Text('Advertisement',
-              style: TextStyle(color: c.textMuted, fontSize: 10, letterSpacing: 0.5))),
+      child: AdWidget(ad: _ad!),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:dart_rss/dart_rss.dart';
 import '../constants/sources.dart';
@@ -11,8 +12,11 @@ class RssService {
     final results = await Future.wait(
       sources.map((source) async {
         try {
-          return await _fetchSource(source);
-        } catch (_) {
+          final r = await _fetchSource(source);
+          debugPrint('[RssService] ${source.name} ($category): ${r.length} items');
+          return r;
+        } catch (e) {
+          debugPrint('[RssService] ${source.name} ($category) THREW: $e');
           return <ResourceModel>[];
         }
       }),
@@ -86,7 +90,11 @@ class RssService {
         .timeout(const Duration(seconds: 25));
 
     // Accept 200 and common redirect targets (some feeds return 301→200)
-    if (response.statusCode < 200 || response.statusCode >= 400) return [];
+    if (response.statusCode < 200 || response.statusCode >= 400) {
+      debugPrint('[RssService] ${source.name}: HTTP ${response.statusCode} '
+          'for ${source.feedUrl}');
+      return [];
+    }
 
     // Parse synchronously on the main isolate.
     // compute() was causing silent failures: any exception inside the isolate
@@ -108,8 +116,15 @@ class RssService {
 
     // Each video is enclosed in <entry>...</entry>
     final entryRe = RegExp(r'<entry>([\s\S]*?)</entry>');
+    final matches = entryRe.allMatches(body).toList();
+    if (matches.isEmpty) {
+      // Zero <entry> blocks usually means: wrong/dead channel ID, or
+      // YouTube returned an error page instead of the Atom feed.
+      debugPrint('[RssService] ${source.name}: 0 <entry> blocks in response '
+          '(${body.length} bytes) — check channel_id in feedUrl');
+    }
 
-    for (final m in entryRe.allMatches(body)) {
+    for (final m in matches) {
       try {
         final e = m.group(1) ?? '';
 
@@ -142,7 +157,8 @@ class RssService {
           publishedAt: published,
           description: description.isNotEmpty ? description : null,
         ));
-      } catch (_) {
+      } catch (e) {
+        debugPrint('[RssService] ${source.name}: entry parse error: $e');
         continue; // Skip malformed entries
       }
     }
